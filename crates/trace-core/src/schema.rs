@@ -26,10 +26,21 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
         PRIMARY KEY (source_id, target_id)
       );
 
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        revoked_at INTEGER
+      );
+
       CREATE INDEX IF NOT EXISTS idx_nodes_parent_position ON nodes(parent_id, position);
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type);
       CREATE INDEX IF NOT EXISTS idx_note_relations_source ON note_relations(source_id);
       CREATE INDEX IF NOT EXISTS idx_note_relations_target ON note_relations(target_id);
+      CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
       ",
         )
         .map_err(|error| format!("No se pudo asegurar el esquema Trace: {error}"))?;
@@ -160,7 +171,9 @@ mod tests {
 
         assert!(table_exists(&connection, "nodes"));
         assert!(table_exists(&connection, "note_relations"));
+        assert!(table_exists(&connection, "refresh_tokens"));
         assert!(index_exists(&connection, "idx_nodes_parent_position"));
+        assert!(index_exists(&connection, "idx_refresh_tokens_expires_at"));
         assert!(has_column(&connection, "nodes", "tags").expect("tags column check works"));
     }
 

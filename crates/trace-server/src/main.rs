@@ -66,6 +66,9 @@ const MAX_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
 const MAX_RESTORE_DB_BYTES: u64 = 256 * 1024 * 1024;
 const AUTH_RATE_LIMIT_MAX_ATTEMPTS: usize = 8;
 const AUTH_RATE_LIMIT_WINDOW_SECONDS: i64 = 15 * 60;
+const ACCESS_TOKEN_TTL_SECONDS: i64 = 15 * 60;
+const REFRESH_TOKEN_TTL_SECONDS: i64 = 60 * 60 * 24 * 30;
+const REFRESH_COOKIE_NAME: &str = "trace_refresh";
 const CONTENT_SECURITY_POLICY: &str = concat!(
     "default-src 'self'; ",
     "script-src 'self'; ",
@@ -106,6 +109,18 @@ struct LoginRequest {
 struct AuthResponse {
     token: String,
     user_id: String,
+}
+
+struct RefreshTokenParts {
+    id: String,
+    secret: String,
+}
+
+struct RefreshTokenRecord {
+    user_id: String,
+    token_hash: String,
+    expires_at: i64,
+    revoked_at: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -169,6 +184,8 @@ fn build_router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/api/setup/status", get(setup_status))
         .route("/api/auth/login", post(login))
+        .route("/api/auth/refresh", post(refresh_auth))
+        .route("/api/auth/logout", post(logout))
         .merge(protected_api)
         .fallback(static_asset)
         .with_state(state)
@@ -186,6 +203,7 @@ fn initialize_state(data_dir: PathBuf) -> Result<AppState> {
     schema::ensure_trace_schema(&connection).map_err(anyhow::Error::msg)?;
     schema::ensure_markdown_index_schema(&connection).map_err(anyhow::Error::msg)?;
     ensure_server_schema(&connection)?;
+    cleanup_expired_refresh_tokens(&connection)?;
     let jwt_secret = get_or_create_jwt_secret(&connection)?;
 
     Ok(AppState {
@@ -229,6 +247,16 @@ fn ensure_server_schema(connection: &Connection) -> Result<()> {
             ",
         )
         .context("No se pudo asegurar schema del servidor")
+}
+
+fn cleanup_expired_refresh_tokens(connection: &Connection) -> Result<()> {
+    connection
+        .execute(
+            "DELETE FROM refresh_tokens WHERE expires_at < ?1",
+            [unix_timestamp()],
+        )
+        .context("No se pudieron limpiar refresh tokens expirados")?;
+    Ok(())
 }
 
 fn get_or_create_jwt_secret(connection: &Connection) -> Result<String> {
@@ -308,7 +336,13 @@ async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>)
     match create_admin(&state, payload) {
         Ok(auth) => {
             clear_auth_attempts(&state, &rate_limit_key);
-            (StatusCode::CREATED, Json(auth)).into_response()
+            match create_refresh_token(&state, &auth.user_id) {
+                Ok(refresh_token) => with_refresh_cookie(
+                    (StatusCode::CREATED, Json(auth)).into_response(),
+                    &refresh_token,
+                ),
+                Err(error) => server_error(error),
+            }
         }
         Err(SetupError::AlreadyConfigured) => StatusCode::NOT_FOUND.into_response(),
         Err(SetupError::BadRequest(message)) => {
@@ -329,7 +363,12 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
     match login_user(&state, payload) {
         Ok(Some(auth)) => {
             clear_auth_attempts(&state, &rate_limit_key);
-            Json(auth).into_response()
+            match create_refresh_token(&state, &auth.user_id) {
+                Ok(refresh_token) => {
+                    with_refresh_cookie(Json(auth).into_response(), &refresh_token)
+                }
+                Err(error) => server_error(error),
+            }
         }
         Ok(None) => (
             StatusCode::UNAUTHORIZED,
@@ -338,6 +377,28 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
             .into_response(),
         Err(error) => server_error(error),
     }
+}
+
+async fn refresh_auth(State(state): State<AppState>, request: Request<Body>) -> Response {
+    let Some(raw_token) = refresh_cookie(&request) else {
+        return unauthorized();
+    };
+
+    match refresh_access_token(&state, raw_token) {
+        Ok(Some(auth)) => Json(auth).into_response(),
+        Ok(None) => with_clear_refresh_cookie(unauthorized()),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn logout(State(state): State<AppState>, request: Request<Body>) -> Response {
+    if let Some(raw_token) = refresh_cookie(&request) {
+        if let Err(error) = revoke_refresh_token(&state, raw_token) {
+            return server_error(error);
+        }
+    }
+
+    with_clear_refresh_cookie(StatusCode::NO_CONTENT.into_response())
 }
 
 async fn require_auth(
@@ -645,18 +706,26 @@ fn default_workspace_id(connection: &Connection) -> Result<Option<String>> {
 }
 
 fn hash_password(password: &str) -> Result<String> {
+    hash_secret(password)
+}
+
+fn hash_secret(secret: &str) -> Result<String> {
     let salt = SaltString::generate(&mut OsRng);
     Ok(Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
-        .map_err(|error| anyhow::anyhow!("No se pudo hashear password: {error}"))?
+        .hash_password(secret.as_bytes(), &salt)
+        .map_err(|error| anyhow::anyhow!("No se pudo hashear secreto: {error}"))?
         .to_string())
 }
 
 fn verify_password(password: &str, password_hash: &str) -> Result<bool> {
-    let parsed_hash = PasswordHash::new(password_hash)
-        .map_err(|error| anyhow::anyhow!("Hash de password invalido: {error}"))?;
+    verify_secret(password, password_hash)
+}
+
+fn verify_secret(secret: &str, secret_hash: &str) -> Result<bool> {
+    let parsed_hash = PasswordHash::new(secret_hash)
+        .map_err(|error| anyhow::anyhow!("Hash de secreto invalido: {error}"))?;
     Ok(Argon2::default()
-        .verify_password(password.as_bytes(), &parsed_hash)
+        .verify_password(secret.as_bytes(), &parsed_hash)
         .is_ok())
 }
 
@@ -667,7 +736,7 @@ fn build_auth_response(
 ) -> Result<AuthResponse> {
     let claims = Claims {
         sub: user_id.clone(),
-        exp: unix_timestamp() + 60 * 60 * 24 * 7,
+        exp: unix_timestamp() + ACCESS_TOKEN_TTL_SECONDS,
         vault_id,
     };
     let token = encode(
@@ -677,6 +746,97 @@ fn build_auth_response(
     )
     .context("No se pudo firmar JWT")?;
     Ok(AuthResponse { token, user_id })
+}
+
+fn create_refresh_token(state: &AppState, user_id: &str) -> Result<String> {
+    let connection = open_connection(&state.db_path)?;
+    let parts = RefreshTokenParts {
+        id: Uuid::new_v4().to_string(),
+        secret: format!("{}{}", Uuid::new_v4(), Uuid::new_v4()),
+    };
+    let token_hash = hash_secret(&parts.secret)?;
+    let now = unix_timestamp();
+    let expires_at = now + REFRESH_TOKEN_TTL_SECONDS;
+
+    connection
+        .execute(
+            "INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, revoked_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
+            params![parts.id, user_id, token_hash, expires_at, now],
+        )
+        .context("No se pudo guardar refresh token")?;
+
+    Ok(format!("{}.{}", parts.id, parts.secret))
+}
+
+fn refresh_access_token(state: &AppState, raw_token: &str) -> Result<Option<AuthResponse>> {
+    let Some(parts) = parse_refresh_token(raw_token) else {
+        return Ok(None);
+    };
+
+    let connection = open_connection(&state.db_path)?;
+    let record = connection
+        .query_row(
+            "SELECT user_id, token_hash, expires_at, revoked_at
+             FROM refresh_tokens
+             WHERE id = ?1",
+            [parts.id.as_str()],
+            |row| {
+                Ok(RefreshTokenRecord {
+                    user_id: row.get(0)?,
+                    token_hash: row.get(1)?,
+                    expires_at: row.get(2)?,
+                    revoked_at: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .context("No se pudo leer refresh token")?;
+
+    let Some(record) = record else {
+        return Ok(None);
+    };
+    if record.revoked_at.is_some() || record.expires_at < unix_timestamp() {
+        return Ok(None);
+    }
+    if !verify_secret(&parts.secret, &record.token_hash)? {
+        return Ok(None);
+    }
+
+    let vault_id = default_workspace_id(&connection)?.unwrap_or_else(|| "default".to_string());
+    Ok(Some(build_auth_response(
+        &state.jwt_secret,
+        record.user_id,
+        vault_id,
+    )?))
+}
+
+fn revoke_refresh_token(state: &AppState, raw_token: &str) -> Result<()> {
+    let Some(parts) = parse_refresh_token(raw_token) else {
+        return Ok(());
+    };
+
+    let connection = open_connection(&state.db_path)?;
+    connection
+        .execute(
+            "UPDATE refresh_tokens
+             SET revoked_at = ?1
+             WHERE id = ?2 AND revoked_at IS NULL",
+            params![unix_timestamp(), parts.id],
+        )
+        .context("No se pudo revocar refresh token")?;
+    Ok(())
+}
+
+fn parse_refresh_token(raw_token: &str) -> Option<RefreshTokenParts> {
+    let (id, secret) = raw_token.split_once('.')?;
+    if id.trim().is_empty() || secret.trim().is_empty() {
+        return None;
+    }
+    Some(RefreshTokenParts {
+        id: id.to_string(),
+        secret: secret.to_string(),
+    })
 }
 
 fn auth_rate_limit_key(kind: &str, email: &str) -> String {
@@ -817,6 +977,42 @@ fn bearer_token(request: &Request<Body>) -> Option<&str> {
     header.strip_prefix("Bearer ")
 }
 
+fn refresh_cookie(request: &Request<Body>) -> Option<&str> {
+    let header = request.headers().get(header::COOKIE)?.to_str().ok()?;
+    header.split(';').find_map(|part| {
+        let (name, value) = part.trim().split_once('=')?;
+        (name == REFRESH_COOKIE_NAME).then_some(value)
+    })
+}
+
+fn refresh_cookie_header(token: &str) -> Result<HeaderValue> {
+    HeaderValue::from_str(&format!(
+        "{REFRESH_COOKIE_NAME}={token}; Path=/api/auth; Max-Age={REFRESH_TOKEN_TTL_SECONDS}; HttpOnly; SameSite=Lax"
+    ))
+    .context("No se pudo crear cookie de refresh")
+}
+
+fn clear_refresh_cookie_header() -> HeaderValue {
+    HeaderValue::from_static("trace_refresh=; Path=/api/auth; Max-Age=0; HttpOnly; SameSite=Lax")
+}
+
+fn with_refresh_cookie(mut response: Response, token: &str) -> Response {
+    match refresh_cookie_header(token) {
+        Ok(cookie) => {
+            response.headers_mut().insert(header::SET_COOKIE, cookie);
+            response
+        }
+        Err(error) => server_error(error),
+    }
+}
+
+fn with_clear_refresh_cookie(mut response: Response) -> Response {
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, clear_refresh_cookie_header());
+    response
+}
+
 fn unauthorized() -> Response {
     (
         StatusCode::UNAUTHORIZED,
@@ -953,6 +1149,76 @@ mod tests {
             .await
             .expect("notes responds");
         assert_eq!(notes.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn refresh_cookie_restores_session_and_logout_revokes_it() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let cookie = setup
+            .headers()
+            .get(header::SET_COOKIE)
+            .expect("refresh cookie is set")
+            .to_str()
+            .expect("cookie is valid")
+            .split(';')
+            .next()
+            .expect("cookie pair exists")
+            .to_string();
+
+        let refresh = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/refresh")
+                    .header(header::COOKIE, cookie.as_str())
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("refresh responds");
+        assert_eq!(refresh.status(), StatusCode::OK);
+        let auth = response_body_json(refresh).await;
+        assert!(auth["token"].as_str().is_some());
+
+        let logout = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/logout")
+                    .header(header::COOKIE, cookie.as_str())
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("logout responds");
+        assert_eq!(logout.status(), StatusCode::NO_CONTENT);
+
+        let revoked_refresh = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/refresh")
+                    .header(header::COOKIE, cookie)
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("refresh responds");
+        assert_eq!(revoked_refresh.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

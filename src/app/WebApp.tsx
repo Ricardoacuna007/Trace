@@ -3,7 +3,9 @@ import { LogIn } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NoteGraphData } from '../features/notes-graph/graph'
 import { previewFromContent } from '../features/notes-editor/contentMetrics'
+import { clearAccessToken, setAccessToken } from '../lib/auth'
 import type { NoteBacklink, TraceUIModules } from '../lib/db'
+import { apiJson, readJson, refreshAccessToken } from '../lib/http'
 import { withTree } from '../lib/workspace/nodeTree'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../store/types'
 import type { Note } from '../types/note'
@@ -31,7 +33,6 @@ interface FormState {
   password: string
 }
 
-const TOKEN_KEY = 'trace.selfhost.token'
 const DEFAULT_TRACE_CONFIG_JSON = '{}'
 const EMPTY_GRAPH: NoteGraphData = { nodes: [], links: [] }
 const DEFAULT_UI_MODULES: TraceUIModules = {
@@ -39,18 +40,6 @@ const DEFAULT_UI_MODULES: TraceUIModules = {
   show_backlinks: true,
   show_node_icons: true,
   enable_autosave: true,
-}
-
-function authHeaders(token: string): HeadersInit {
-  return { Authorization: `Bearer ${token}` }
-}
-
-async function readJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const message = await response.text()
-    throw new Error(message || `HTTP ${response.status}`)
-  }
-  return response.json() as Promise<T>
 }
 
 function isNote(node: AppNode | undefined): node is Note {
@@ -91,7 +80,6 @@ export function WebApp() {
   const saveTimerRef = useRef<number | null>(null)
   const queuedNoteRef = useRef<Note | null>(null)
   const [mode, setMode] = useState<AuthMode>('loading')
-  const [token, setToken] = useState(() => window.localStorage.getItem(TOKEN_KEY) ?? '')
   const [form, setForm] = useState<FormState>({
     workspaceName: 'Trace',
     email: '',
@@ -127,17 +115,12 @@ export function WebApp() {
     [nodes, relations, selectedNote?.id],
   )
 
-  const loadWorkspace = useCallback(async (nextToken = token) => {
-    if (!nextToken) {
-      setMode('login')
-      return
-    }
-
+  const loadWorkspace = useCallback(async () => {
     try {
       const [nextNotes, nextRelations, nextGraph] = await Promise.all([
-        fetch('/api/notes', { headers: authHeaders(nextToken) }).then((response) => readJson<AppNode[]>(response)),
-        fetch('/api/relations', { headers: authHeaders(nextToken) }).then((response) => readJson<NoteRelation[]>(response)),
-        fetch('/api/graph', { headers: authHeaders(nextToken) }).then((response) => readJson<NoteGraphData>(response)),
+        apiJson<AppNode[]>('/api/notes'),
+        apiJson<NoteRelation[]>('/api/relations'),
+        apiJson<NoteGraphData>('/api/graph'),
       ])
       setNodes(nextNotes)
       setRelations(nextRelations)
@@ -152,29 +135,25 @@ export function WebApp() {
       setMode('app')
       setMessage(null)
     } catch (error) {
-      window.localStorage.removeItem(TOKEN_KEY)
-      setToken('')
+      clearAccessToken()
       setMode('login')
       setMessage(error instanceof Error ? error.message : 'No se pudo cargar el workspace')
     }
-  }, [token])
+  }, [])
 
-  const persistQueuedNote = useCallback(async (note: Note, nextToken = token) => {
-    if (!nextToken) {
-      return
-    }
+  const persistQueuedNote = useCallback(async (note: Note) => {
     setSaveStatus('saving')
     try {
-      const updated = await fetch(`/api/notes/${note.id}`, {
+      const updated = await apiJson<AppNode>(`/api/notes/${note.id}`, {
         method: 'PUT',
-        headers: { ...authHeaders(nextToken), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: note.title,
           content: note.content,
           parentId: note.parentId,
           tags: note.tags ?? [],
         }),
-      }).then((response) => readJson<AppNode>(response))
+      })
       setNodes((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       setSaveStatus('saved')
       setMessage('Guardado')
@@ -182,7 +161,7 @@ export function WebApp() {
       setSaveStatus('error')
       setMessage(error instanceof Error ? error.message : 'No se pudo guardar')
     }
-  }, [token])
+  }, [])
 
   const queuePersistNote = useCallback((note: Note) => {
     queuedNoteRef.current = note
@@ -210,7 +189,12 @@ export function WebApp() {
           setMode('setup')
           return
         }
-        await loadWorkspace(token)
+        const refreshed = await refreshAccessToken()
+        if (!refreshed) {
+          setMode('login')
+          return
+        }
+        await loadWorkspace()
       } catch (error) {
         if (!cancelled) {
           setMode('login')
@@ -226,7 +210,7 @@ export function WebApp() {
         window.clearTimeout(saveTimerRef.current)
       }
     }
-  }, [loadWorkspace, token])
+  }, [loadWorkspace])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -246,15 +230,15 @@ export function WebApp() {
       const isSetup = mode === 'setup'
       const auth = await fetch(isSetup ? '/setup' : '/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(isSetup
           ? { workspace_name: form.workspaceName, email: form.email, password: form.password }
           : { email: form.email, password: form.password }),
       }).then((response) => readJson<AuthResponse>(response))
 
-      window.localStorage.setItem(TOKEN_KEY, auth.token)
-      setToken(auth.token)
-      await loadWorkspace(auth.token)
+      setAccessToken(auth.token)
+      await loadWorkspace()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo autenticar')
     } finally {
@@ -263,16 +247,13 @@ export function WebApp() {
   }, [form.email, form.password, form.workspaceName, loadWorkspace, mode])
 
   const createNote = useCallback(async () => {
-    if (!token) {
-      return
-    }
     setBusy(true)
     try {
-      const note = await fetch('/api/notes', {
+      const note = await apiJson<AppNode>('/api/notes', {
         method: 'POST',
-        headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Untitled', content: '[]', tags: [] }),
-      }).then((response) => readJson<AppNode>(response))
+      })
       setNodes((current) => [note, ...current])
       setSelectedNodeId(note.id)
       setActiveView('editor')
@@ -283,7 +264,7 @@ export function WebApp() {
     } finally {
       setBusy(false)
     }
-  }, [token])
+  }, [])
 
   const updateSelectedNote = useCallback((updater: (note: Note) => Note) => {
     const currentNote = selectedNote
@@ -335,17 +316,14 @@ export function WebApp() {
       selectNode(existing.id)
       return
     }
-    if (!token) {
-      return
-    }
-    const note = await fetch('/api/notes', {
+    const note = await apiJson<AppNode>('/api/notes', {
       method: 'POST',
-      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: normalizedTitle, content: '[]', tags: [] }),
-    }).then((response) => readJson<AppNode>(response))
+    })
     setNodes((current) => [note, ...current])
     selectNode(note.id)
-  }, [nodes, selectNode, token])
+  }, [nodes, selectNode])
 
   const pinNote = useCallback((noteId: string) => {
     setPinnedNoteIds((current) => current.includes(noteId) ? current : [...current, noteId])
@@ -356,8 +334,11 @@ export function WebApp() {
   }, [])
 
   const logout = useCallback(() => {
-    window.localStorage.removeItem(TOKEN_KEY)
-    setToken('')
+    void fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    clearAccessToken()
     setNodes([])
     setRelations([])
     setSelectedNodeId(null)
