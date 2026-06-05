@@ -99,3 +99,34 @@ No se recomienda migrar el desktop a Flutter ni a una UI nativa pura. El stack
 actual de Tauri + React + SQLite sigue siendo adecuado para una app ligera,
 rapida de iterar y local-first. El self-hosted debe crecer como una capa
 opcional all-in-one, no como reemplazo del cliente local.
+
+## Estado de implementacion
+
+Implementado:
+
+- Workspace Cargo en la raiz con `crates/trace-core`, `crates/trace-server` y
+  `src-tauri`.
+- `trace-core` contiene el schema SQLite compartido, tipos base de modelos,
+  configuracion de vault y claims JWT.
+- `src-tauri` consume `trace-core::schema`, evitando duplicar migraciones.
+- `trace-server` arranca como binario all-in-one con:
+  - `GET /health`
+  - `GET /`
+  - `GET /setup`
+  - `POST /setup`
+  - `GET /api/setup/status`
+  - `POST /api/auth/login`
+  - SQLite en `--data-dir` / `TRACE_DATA_DIR`
+  - migraciones automaticas al iniciar
+  - usuario admin inicial
+  - JWT firmado con secreto persistido en SQLite
+- `Dockerfile` y `docker-compose.yml` para `docker compose up -d`.
+
+Pendiente:
+
+- Middleware JWT para proteger rutas `/api`.
+- API HTTP completa de notas y grafo.
+- Backup/restore ZIP.
+- UI web real conectada a la API.
+- Push/pull desktop-servidor. Para v1 se mantiene la recomendacion de Modelo B:
+  vaults independientes con operaciones explicitas antes de sync automatico.

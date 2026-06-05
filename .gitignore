@@ -15,8 +15,11 @@ dist-ssr
 .env.*
 
 # Tauri / Rust build outputs
+target/
 src-tauri/target/
 src-tauri/gen/
+crates/trace-server/web-dist/*
+!crates/trace-server/web-dist/.gitkeep
 
 # Local vaults / databases
 .trace/

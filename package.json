@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "check": "npm run lint && npm run test && npm run build && npm run tauri:test && npm run tauri:clippy",
+    "check": "npm run lint && npm run test && npm run build && npm run server:prepare-web && npm run cargo:test && npm run cargo:clippy",
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
+    "server:prepare-web": "node scripts/prepare-server-web.mjs",
+    "server:dev": "npm run build && npm run server:prepare-web && cargo run -p trace-server --",
+    "server:build": "npm run build && npm run server:prepare-web && cargo build --release -p trace-server",
+    "cargo:clippy": "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo:test": "cargo test --workspace",
     "test": "vitest run",
     "tauri:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "tauri:test": "cargo test --manifest-path src-tauri/Cargo.toml"

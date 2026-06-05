@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trace Server</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0d0f12;
+        color: #e8eaf0;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: min(520px, calc(100vw - 32px));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        background: #13161b;
+        padding: 28px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        font-weight: 400;
+      }
+
+      p {
+        margin: 0;
+        color: #8b909e;
+        line-height: 1.6;
+      }
+
+      code {
+        color: #5e8bff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Trace Server</h1>
+      <p>
+        El servidor all-in-one esta corriendo. La UI web completa se conectara a este binario
+        cuando la API de notas este lista. Healthcheck: <code>/health</code>.
+      </p>
+    </main>
+  </body>
+</html>
