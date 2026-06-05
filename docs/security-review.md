@@ -75,9 +75,7 @@ Para exponer a internet:
 
 Prioridad 0 antes de declarar un release publico:
 
-- Tests HTTP automatizados para headers de seguridad, auth y restore.
-- Guia de reverse proxy con HTTPS.
-- Confirmar Docker CI verde con smoke test de `/health`.
+- Revisar manualmente el draft de release antes de publicarlo.
 
 Prioridad 1:
 
@@ -101,6 +99,12 @@ Verificado localmente:
 - `npm run check`
 - `cargo test -p trace-server`
 - `cargo clippy -p trace-server --all-targets -- -D warnings`
+
+Verificado en CI:
+
+- `Build Linux Desktop` con artefacto `trace-linux-x86_64`.
+- `Build Docker Image` con smoke test de `/health`.
+- `Publish Docker Image` para GHCR en tag `v0.1.0`.
 
 No verificado localmente por limitacion de la maquina:
 

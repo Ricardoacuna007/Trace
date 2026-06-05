@@ -249,6 +249,7 @@ Direccion self-hosted all-in-one:
 Seguridad:
 
 - `docs/security-review.md`
+- `docs/reverse-proxy.md`
 
 Versionado y releases:
 
