@@ -1,0 +1,22 @@
+/* Nocturne preset: deep dark + cool purple accent */
+:root {
+  --trace-bg: #080912;
+  --trace-panel: #101224;
+  --trace-panel-soft: #171a2f;
+  --trace-border: #30345c;
+  --trace-muted: #959cbc;
+}
+
+body {
+  background:
+    radial-gradient(circle at 15% 12%, rgba(121, 92, 243, 0.16) 0, transparent 38%),
+    radial-gradient(circle at 80% 84%, rgba(90, 63, 191, 0.12) 0, transparent 43%),
+    var(--trace-bg);
+}
+
+.trace-editor .bn-container {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--trace-accent) 36%, transparent),
+    0 18px 40px rgba(23, 19, 64, 0.3);
+}
+

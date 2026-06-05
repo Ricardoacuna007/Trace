@@ -1,0 +1,13 @@
+{
+  "theme": "dark",
+  "accent_color": "#7ee4c8",
+  "font_family": "Space Grotesk",
+  "editor_width": "centered",
+  "vim_mode": false,
+  "ui_modules": {
+    "show_breadcrumbs": false,
+    "show_backlinks": true,
+    "show_node_icons": true,
+    "enable_autosave": true
+  }
+}

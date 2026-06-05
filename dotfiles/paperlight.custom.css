@@ -1,0 +1,23 @@
+/* Paperlight preset: calm light mode for long reading */
+:root[data-trace-theme='light'] {
+  --trace-bg: #f4f6fb;
+  --trace-panel: #ffffff;
+  --trace-panel-soft: #f7f9ff;
+  --trace-border: #d6ddea;
+  --trace-muted: #4e5b72;
+}
+
+body {
+  color: #1b2432;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(113, 150, 232, 0.08) 0, transparent 34%),
+    radial-gradient(circle at 84% 90%, rgba(154, 180, 241, 0.08) 0, transparent 42%),
+    var(--trace-bg);
+}
+
+.trace-editor .bn-container {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--trace-accent) 24%, transparent),
+    0 14px 30px rgba(76, 96, 135, 0.1);
+}
+

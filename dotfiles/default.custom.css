@@ -1,0 +1,9 @@
+/* Default preset: minimal overrides, keeps core Trace look. */
+:root {
+  --trace-bg: #0d0e12;
+  --trace-panel: #12151d;
+  --trace-panel-soft: #171b25;
+  --trace-border: #2a3040;
+  --trace-muted: #99a3b8;
+}
+

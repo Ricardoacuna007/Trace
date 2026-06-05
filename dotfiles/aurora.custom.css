@@ -1,0 +1,22 @@
+/* Aurora preset: cyan accent + subtle glow */
+:root {
+  --trace-bg: #09101a;
+  --trace-panel: #0f1726;
+  --trace-panel-soft: #152236;
+  --trace-border: #27415f;
+  --trace-muted: #8aa4c4;
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(44, 173, 255, 0.18) 0, transparent 36%),
+    radial-gradient(circle at 85% 90%, rgba(88, 214, 255, 0.14) 0, transparent 42%),
+    var(--trace-bg);
+}
+
+.trace-editor .bn-container {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--trace-accent) 30%, transparent),
+    0 20px 45px rgba(19, 67, 108, 0.22);
+}
+
