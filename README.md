@@ -67,6 +67,31 @@ Artefactos de salida (Windows):
 - `src-tauri/target/release/bundle/msi/Trace_0.1.0_x64_en-US.msi`
 - `src-tauri/target/release/bundle/nsis/Trace_0.1.0_x64-setup.exe`
 
+## Self-host all-in-one
+
+La ruta simple para probar Trace en servidor es Docker:
+
+```bash
+docker compose up -d
+```
+
+Despues abre:
+
+```text
+http://localhost:8080
+```
+
+En el primer arranque Trace muestra el setup para crear el workspace y el admin.
+La API, la UI web y SQLite viven en el mismo contenedor; los datos quedan en el
+volumen `trace_data`.
+
+Para correr el binario directamente:
+
+```bash
+npm run server:build
+TRACE_DATA_DIR=./trace-data TRACE_BIND=127.0.0.1:8080 ./target/release/trace-server
+```
+
 ## Estructura principal
 
 ```text
