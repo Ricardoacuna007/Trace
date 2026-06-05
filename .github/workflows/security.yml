@@ -1,0 +1,76 @@
+name: Security Audit
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  cargo-audit:
+    name: Cargo audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust workspace
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit
+
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+  cargo-clippy:
+    name: Cargo clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust workspace
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Run cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
