@@ -290,7 +290,11 @@ mod tests {
                 title: Some("  My Note  ".to_string()),
                 parent_id: None,
                 content: Some(r#"[{"type":"paragraph","content":"Hello"}]"#.to_string()),
-                tags: vec![" Rust ".to_string(), "#rust".to_string(), "Trace".to_string()],
+                tags: vec![
+                    " Rust ".to_string(),
+                    "#rust".to_string(),
+                    "Trace".to_string(),
+                ],
             },
         )
         .expect("note is created");
@@ -332,7 +336,7 @@ mod tests {
             &updated.id,
             &[target.id.clone(), target.id.clone()],
         )
-            .expect("relations insert");
+        .expect("relations insert");
         assert_eq!(created.len(), 2);
 
         assert!(delete_note(&connection, &note.id).expect("delete succeeds"));

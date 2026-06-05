@@ -218,7 +218,11 @@ mod tests {
                 r#"[{"type":"paragraph","content":[{"type":"text","text":"Beta"}]}]"#,
             ),
             note("b", "Beta", r#"[{"type":"paragraph","content":"No refs"}]"#),
-            note("c", "Gamma", r#"[{"type":"paragraph","content":"No refs"}]"#),
+            note(
+                "c",
+                "Gamma",
+                r#"[{"type":"paragraph","content":"No refs"}]"#,
+            ),
         ];
         let relations = vec![NoteRelation {
             source_id: "b".to_string(),

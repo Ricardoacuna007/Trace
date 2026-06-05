@@ -14,7 +14,7 @@ use argon2::{
 };
 use axum::{
     body::{Body, Bytes},
-    extract::{Path, State},
+    extract::{DefaultBodyLimit, Path, State},
     http::{header, HeaderValue, Request, StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -60,6 +60,19 @@ struct AppState {
 struct WebAssets;
 
 const FALLBACK_INDEX_HTML: &str = include_str!("../web/index.html");
+const MAX_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
+const MAX_RESTORE_DB_BYTES: u64 = 256 * 1024 * 1024;
+const CONTENT_SECURITY_POLICY: &str = concat!(
+    "default-src 'self'; ",
+    "script-src 'self'; ",
+    "style-src 'self' 'unsafe-inline'; ",
+    "img-src 'self' data: blob:; ",
+    "font-src 'self' data:; ",
+    "connect-src 'self'; ",
+    "object-src 'none'; ",
+    "base-uri 'self'; ",
+    "frame-ancestors 'none'"
+);
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -129,10 +142,7 @@ async fn main() -> Result<()> {
         .route("/api/graph", get(api_graph))
         .route("/api/backup", post(api_backup))
         .route("/api/restore", post(api_restore))
-        .route_layer(middleware::from_fn_with_state(
-            state.clone(),
-            require_auth,
-        ));
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     let app = Router::new()
         .route("/", get(index))
@@ -143,6 +153,8 @@ async fn main() -> Result<()> {
         .merge(protected_api)
         .fallback(static_asset)
         .with_state(state)
+        .layer(middleware::from_fn(security_headers))
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
         .layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(args.bind)
@@ -290,7 +302,11 @@ async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>)
 async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>) -> Response {
     match login_user(&state, payload) {
         Ok(Some(auth)) => Json(auth).into_response(),
-        Ok(None) => (StatusCode::UNAUTHORIZED, Json(error_body("Credenciales invalidas"))).into_response(),
+        Ok(None) => (
+            StatusCode::UNAUTHORIZED,
+            Json(error_body("Credenciales invalidas")),
+        )
+            .into_response(),
         Err(error) => server_error(error),
     }
 }
@@ -321,6 +337,28 @@ async fn require_auth(
     next.run(request).await
 }
 
+async fn security_headers(request: Request<Body>, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(CONTENT_SECURITY_POLICY),
+    );
+    headers.insert(
+        "x-content-type-options",
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
+    headers.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
+    headers.insert(
+        "permissions-policy",
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+
+    response
+}
+
 async fn api_list_notes(State(state): State<AppState>) -> Response {
     match open_connection(&state.db_path).and_then(|connection| {
         notes::list_notes(&connection).context("No se pudieron listar notas")
@@ -331,9 +369,9 @@ async fn api_list_notes(State(state): State<AppState>) -> Response {
 }
 
 async fn api_get_note(State(state): State<AppState>, Path(id): Path<String>) -> Response {
-    match open_connection(&state.db_path).and_then(|connection| {
-        notes::get_note(&connection, &id).context("No se pudo leer nota")
-    }) {
+    match open_connection(&state.db_path)
+        .and_then(|connection| notes::get_note(&connection, &id).context("No se pudo leer nota"))
+    {
         Ok(Some(note)) => Json(note).into_response(),
         Ok(None) => not_found("Nota no encontrada"),
         Err(error) => server_error(error),
@@ -413,10 +451,7 @@ async fn api_graph(State(state): State<AppState>) -> Response {
 async fn api_backup(State(state): State<AppState>) -> Response {
     match build_backup_zip(&state) {
         Ok(zip_bytes) => {
-            let filename = format!(
-                "trace-backup-{}.zip",
-                Utc::now().format("%Y%m%d%H%M%S")
-            );
+            let filename = format!("trace-backup-{}.zip", Utc::now().format("%Y%m%d%H%M%S"));
             let mut response = zip_bytes.into_response();
             response.headers_mut().insert(
                 header::CONTENT_TYPE,
@@ -425,7 +460,9 @@ async fn api_backup(State(state): State<AppState>) -> Response {
             if let Ok(value) =
                 HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
             {
-                response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_DISPOSITION, value);
             }
             response
         }
@@ -457,7 +494,9 @@ fn embedded_asset(path: &str) -> Option<Response> {
     let content_type = HeaderValue::from_str(mime.as_ref())
         .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
     let mut response = asset.data.into_owned().into_response();
-    response.headers_mut().insert(header::CONTENT_TYPE, content_type);
+    response
+        .headers_mut()
+        .insert(header::CONTENT_TYPE, content_type);
     Some(response)
 }
 
@@ -485,7 +524,9 @@ fn create_admin(state: &AppState, payload: SetupRequest) -> Result<AuthResponse,
     let password = payload.password;
 
     if workspace_name.is_empty() {
-        return Err(SetupError::BadRequest("workspace_name es requerido".to_string()));
+        return Err(SetupError::BadRequest(
+            "workspace_name es requerido".to_string(),
+        ));
     }
     if !email.contains('@') {
         return Err(SetupError::BadRequest("email invalido".to_string()));
@@ -590,7 +631,11 @@ fn verify_password(password: &str, password_hash: &str) -> Result<bool> {
         .is_ok())
 }
 
-fn build_auth_response(jwt_secret: &str, user_id: String, vault_id: String) -> Result<AuthResponse> {
+fn build_auth_response(
+    jwt_secret: &str,
+    user_id: String,
+    vault_id: String,
+) -> Result<AuthResponse> {
     let claims = Claims {
         sub: user_id.clone(),
         exp: unix_timestamp() + 60 * 60 * 24 * 7,
@@ -616,8 +661,7 @@ fn build_backup_zip(state: &AppState) -> Result<Vec<u8>> {
         .with_context(|| format!("No se pudo leer {}", state.db_path.display()))?;
 
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
-    let options =
-        SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     writer
         .start_file("trace.db", options)
         .context("No se pudo iniciar archivo trace.db en ZIP")?;
@@ -639,6 +683,10 @@ fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
         .by_name("trace.db")
         .context("El backup no contiene trace.db")?;
 
+    if db_entry.size() > MAX_RESTORE_DB_BYTES {
+        anyhow::bail!("trace.db excede el tamano maximo permitido");
+    }
+
     let restore_path = state.db_path.with_extension("db.restore");
     let backup_path = state.db_path.with_extension("db.before-restore");
     let mut restored_db = File::create(&restore_path)
@@ -647,6 +695,9 @@ fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
     db_entry
         .read_to_end(&mut buffer)
         .context("No se pudo leer trace.db del ZIP")?;
+    if buffer.len() as u64 > MAX_RESTORE_DB_BYTES {
+        anyhow::bail!("trace.db excede el tamano maximo permitido");
+    }
     restored_db
         .write_all(&buffer)
         .context("No se pudo escribir DB restaurada")?;
@@ -701,7 +752,11 @@ fn unix_timestamp() -> i64 {
 }
 
 fn bearer_token(request: &Request<Body>) -> Option<&str> {
-    let header = request.headers().get(header::AUTHORIZATION)?.to_str().ok()?;
+    let header = request
+        .headers()
+        .get(header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
     header.strip_prefix("Bearer ")
 }
 
