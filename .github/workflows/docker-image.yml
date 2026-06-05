@@ -100,6 +100,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Run trace-server API integration tests
+        run: cargo test -p trace-server --test api_test
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 

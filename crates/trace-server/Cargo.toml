@@ -27,4 +27,5 @@ uuid.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["cookies", "json", "rustls-tls"] }
 tower.workspace = true
