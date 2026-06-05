@@ -44,6 +44,26 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
         created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
 
+      CREATE TABLE IF NOT EXISTS sync_state (
+        id TEXT PRIMARY KEY DEFAULT 'singleton' CHECK (id = 'singleton'),
+        server_url TEXT,
+        last_push_at INTEGER,
+        last_pull_at INTEGER,
+        last_sync_ok INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id TEXT PRIMARY KEY,
+        direction TEXT NOT NULL,
+        status TEXT NOT NULL,
+        notes_sent INTEGER DEFAULT 0,
+        notes_recv INTEGER DEFAULT 0,
+        detail TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+
+      INSERT OR IGNORE INTO sync_state (id) VALUES ('singleton');
+
       CREATE INDEX IF NOT EXISTS idx_nodes_parent_position ON nodes(parent_id, position);
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type);
       CREATE INDEX IF NOT EXISTS idx_note_relations_source ON note_relations(source_id);
@@ -52,6 +72,8 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
       CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
       CREATE INDEX IF NOT EXISTS idx_audit_log_event ON audit_log(event);
+      CREATE INDEX IF NOT EXISTS idx_sync_log_status ON sync_log(status);
+      CREATE INDEX IF NOT EXISTS idx_sync_log_created_at ON sync_log(created_at);
       ",
         )
         .map_err(|error| format!("No se pudo asegurar el esquema Trace: {error}"))?;
@@ -184,9 +206,19 @@ mod tests {
         assert!(table_exists(&connection, "note_relations"));
         assert!(table_exists(&connection, "refresh_tokens"));
         assert!(table_exists(&connection, "audit_log"));
+        assert!(table_exists(&connection, "sync_state"));
+        assert!(table_exists(&connection, "sync_log"));
         assert!(index_exists(&connection, "idx_nodes_parent_position"));
         assert!(index_exists(&connection, "idx_refresh_tokens_expires_at"));
         assert!(index_exists(&connection, "idx_audit_log_created_at"));
+        assert!(index_exists(&connection, "idx_sync_log_status"));
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM sync_state", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("sync singleton can be counted"),
+            1
+        );
         assert!(has_column(&connection, "nodes", "tags").expect("tags column check works"));
     }
 
