@@ -58,6 +58,7 @@ interface AppShellProps {
   traceDir: string | null
   uiModules: TraceUIModules
   viewMode: ViewMode
+  renderConnectModal?: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
   onCreateFolder: () => void
   onCreateNote: () => void
@@ -144,6 +145,7 @@ export function AppShell({
   traceDir,
   uiModules,
   viewMode,
+  renderConnectModal = true,
   onContentChange,
   onCreateFolder,
   onCreateNote,
@@ -171,10 +173,13 @@ export function AppShell({
   const connectionCount = selectedNote
     ? noteRelations.filter((relation) => relation.sourceId === selectedNote.id).length
     : 0
+  const workspaceTitle = nodes.find((node) => node.type === 'workspace')?.title
+    ?? activeVaultPath?.split(/[\\/]/).filter(Boolean).at(-1)
+    ?? 'Workspace'
 
   return (
     <div className="app-shell flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--t1)]">
-      <TitleBar />
+      <TitleBar activeView={activeView} workspaceTitle={workspaceTitle} onSetActiveView={onSetActiveView} />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {isSidebarOpen ? (
           <Sidebar
@@ -270,7 +275,7 @@ export function AppShell({
           )}
         </main>
       </div>
-      <ConnectNoteModal />
+      {renderConnectModal ? <ConnectNoteModal /> : null}
     </div>
   )
 }

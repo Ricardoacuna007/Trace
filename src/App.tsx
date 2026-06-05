@@ -1,4 +1,3 @@
-import { open } from '@tauri-apps/plugin-dialog'
 import { useCallback, useEffect } from 'react'
 import type { Block } from '@blocknote/core'
 import {
@@ -16,11 +15,28 @@ import { AppShell } from './app/shell/AppShell'
 import { CommandPalette } from './app/shell/CommandPalette'
 import { ThemeInjector } from './app/shell/ThemeInjector'
 import { VaultSelector } from './app/shell/VaultSelector'
+import { WebApp } from './app/WebApp'
 import { normalizeWikiLinkTitle } from './features/notes-editor/wikiLinks'
-import { TraceWebApp } from './web/TraceWebApp'
+import { isTauri } from './lib/env'
 
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+async function openDirectoryDialog(title: string): Promise<string | null> {
+  if (!isTauri()) {
+    return null
+  }
+
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title,
+  })
+
+  if (typeof selected !== 'string') {
+    return null
+  }
+
+  const trimmed = selected.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 function DesktopApp() {
@@ -212,30 +228,15 @@ function DesktopApp() {
   ])
 
   const handlePickVault = useCallback(async () => {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: 'Selecciona la carpeta de tu boveda',
-    })
+    const selected = await openDirectoryDialog('Selecciona la carpeta de tu boveda')
 
-    if (typeof selected === 'string' && selected.trim().length > 0) {
+    if (selected) {
       await selectVaultPath(selected)
     }
   }, [selectVaultPath])
 
   const pickDirectory = useCallback(async (title: string): Promise<string | null> => {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title,
-    })
-
-    if (typeof selected !== 'string') {
-      return null
-    }
-
-    const trimmed = selected.trim()
-    return trimmed.length > 0 ? trimmed : null
+    return openDirectoryDialog(title)
   }, [])
 
   const handleImportMarkdown = useCallback(async () => {
@@ -392,7 +393,7 @@ function DesktopApp() {
 }
 
 function App() {
-  return isTauriRuntime() ? <DesktopApp /> : <TraceWebApp />
+  return isTauri() ? <DesktopApp /> : <WebApp />
 }
 
 export default App

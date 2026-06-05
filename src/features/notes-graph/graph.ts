@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { isTauri } from '../../lib/env'
 import type { AppNode } from '../../types/workspace'
 
 const GENERIC_TITLES = new Set(['untitled'])
@@ -35,10 +35,6 @@ interface NoteLike {
 export interface ExplicitNoteRelation {
   sourceId: string
   targetId: string
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
 function normalizeText(value: string): string {
@@ -162,10 +158,11 @@ function sanitizeGraphData(graph: unknown): NoteGraphData {
 }
 
 async function generateGraphDataRust(): Promise<NoteGraphData> {
-  if (!isTauriRuntime()) {
+  if (!isTauri()) {
     throw new Error('Rust graph command is only available inside Tauri.')
   }
 
+  const { invoke } = await import('@tauri-apps/api/core')
   const graph = await invoke<unknown>('generate_graph_data')
   return sanitizeGraphData(graph)
 }
@@ -277,7 +274,7 @@ export async function computeGraphData(
   preferredMode: GraphComputeMode,
   explicitRelations: ExplicitNoteRelation[] = [],
 ): Promise<{ graph: NoteGraphData; mode: GraphComputeMode }> {
-  if (preferredMode === 'rust' && isTauriRuntime()) {
+  if (preferredMode === 'rust' && isTauri()) {
     try {
       const graph = await generateGraphDataRust()
       return { graph, mode: 'rust' }

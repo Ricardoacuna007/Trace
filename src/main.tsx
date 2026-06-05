@@ -3,6 +3,7 @@ import { MantineProvider } from '@mantine/core'
 import '@mantine/core/styles.css'
 import './index.css'
 import App from './App.tsx'
+import { EnvProvider } from './lib/env'
 
 document.documentElement.classList.add('dark')
 
@@ -34,6 +35,8 @@ window.addEventListener('unhandledrejection', (event) => {
 
 createRoot(document.getElementById('root')!).render(
   <MantineProvider forceColorScheme="dark">
-    <App />
+    <EnvProvider>
+      <App />
+    </EnvProvider>
   </MantineProvider>,
 )
