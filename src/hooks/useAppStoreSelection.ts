@@ -40,6 +40,7 @@ export function useAppStoreSelection() {
       isDirty: state.isDirty,
       initialize: state.initialize,
       selectVaultPath: state.selectVaultPath,
+      loadNotes: state.loadNotes,
       loadVaultCustomization: state.loadVaultCustomization,
       saveVaultCustomization: state.saveVaultCustomization,
       importMarkdownFromDir: state.importMarkdownFromDir,

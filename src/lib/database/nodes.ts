@@ -1,4 +1,5 @@
 import { DEFAULT_NOTE_TITLE, EMPTY_NOTE_CONTENT, sanitizeStoredContent } from '../../features/notes-editor/note-utils'
+import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
 import {
   createNodeId,
@@ -113,6 +114,35 @@ export async function persistNote(
   )
 
   return { updatedAt }
+}
+
+export async function upsertSyncedNote(note: Note): Promise<void> {
+  const db = await getDatabase()
+  const parentId = note.parentId && await nodeExists(note.parentId) ? note.parentId : null
+
+  await db.execute(
+    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
+     VALUES ($1, $2, 'note', $3, $4, $5, $6, $7, $8)
+     ON CONFLICT(id) DO UPDATE SET
+       title = excluded.title,
+       type = excluded.type,
+       parent_id = excluded.parent_id,
+       content = excluded.content,
+       icon = excluded.icon,
+       tags = excluded.tags,
+       position = excluded.position,
+       updated_at = excluded.updated_at`,
+    [
+      note.id,
+      note.title.trim() || DEFAULT_NOTE_TITLE,
+      parentId,
+      sanitizeStoredContent(note.content),
+      note.icon ?? 'note',
+      toStoredTags(note.tags ?? []),
+      note.position,
+      note.updatedAt,
+    ],
+  )
 }
 
 export async function updateNoteTitle(
@@ -241,4 +271,13 @@ export async function removeNoteRelation(sourceId: string, targetId: string): Pr
 export async function deleteNode(id: string): Promise<void> {
   const db = await getDatabase()
   await db.execute('DELETE FROM nodes WHERE id = $1', [id])
+}
+
+async function nodeExists(id: string): Promise<boolean> {
+  const db = await getDatabase()
+  const rows = await db.select<Array<{ count: number }>>(
+    'SELECT COUNT(*) AS count FROM nodes WHERE id = $1',
+    [id],
+  )
+  return (rows[0]?.count ?? 0) > 0
 }

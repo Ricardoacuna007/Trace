@@ -75,6 +75,7 @@ function DesktopApp() {
     isDirty,
     initialize,
     selectVaultPath,
+    loadNotes,
     loadVaultCustomization,
     saveVaultCustomization,
     importMarkdownFromDir,
@@ -387,6 +388,7 @@ function DesktopApp() {
         onUnpinNote={unpinNote}
         onPrintCurrentNote={handlePrintCurrentNote}
         onUpdateMarkdownProperty={(filePath, key, value) => void updateMarkdownDatabaseProperty(filePath, key, value)}
+        onReloadWorkspace={loadNotes}
       />
     </main>
   )

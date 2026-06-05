@@ -497,6 +497,7 @@ export function WebApp() {
         onUnpinNote={unpinNote}
         onPrintCurrentNote={() => window.print()}
         onUpdateMarkdownProperty={() => setMessage('La base Markdown local solo esta disponible en desktop.')}
+        onReloadWorkspace={loadWorkspace}
       />
       <button
         type="button"

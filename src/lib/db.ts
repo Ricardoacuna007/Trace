@@ -32,6 +32,7 @@ export {
   updateNoteContent,
   updateNoteTags,
   updateNoteTitle,
+  upsertSyncedNote,
 } from './database/nodes'
 
 export {

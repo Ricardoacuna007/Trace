@@ -32,7 +32,7 @@ use rand_core::OsRng;
 use rusqlite::{params, Connection, OptionalExtension};
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use trace_core::{
     auth::Claims,
     graph,
@@ -205,6 +205,7 @@ fn build_router(state: AppState) -> Router {
         .fallback(static_asset)
         .with_state(state)
         .layer(middleware::from_fn(security_headers))
+        .layer(CorsLayer::permissive())
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
         .layer(TraceLayer::new_for_http())
 }

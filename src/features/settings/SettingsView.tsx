@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { TraceUIModules } from '../../lib/db'
 import type { Note } from '../../types/note'
+import type { AppNode } from '../../types/workspace'
 import { CustomizationEditors } from './components/CustomizationEditors'
 import { ImportExportSection } from './components/ImportExportSection'
 import { SettingsHeader } from './components/SettingsHeader'
+import { SyncSection } from './components/SyncSection'
 import { UIModulesSection } from './components/UIModulesSection'
 
 interface SettingsViewProps {
@@ -15,6 +17,7 @@ interface SettingsViewProps {
   customizationSaving: boolean
   ioWorking: boolean
   ioMessage: string | null
+  nodes: AppNode[]
   selectedNote: Note | null
   editorWidth: 'full' | 'centered'
   uiModules: TraceUIModules
@@ -24,6 +27,7 @@ interface SettingsViewProps {
   onExportVaultMarkdown: () => void
   onExportCurrentNoteMarkdown: () => void
   onPrintCurrentNote: () => void
+  onReloadWorkspace: () => Promise<void>
   onSetEditorWidth: (width: 'full' | 'centered') => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
 }
@@ -37,6 +41,7 @@ export function SettingsView({
   customizationSaving,
   ioWorking,
   ioMessage,
+  nodes,
   selectedNote,
   editorWidth,
   uiModules,
@@ -46,6 +51,7 @@ export function SettingsView({
   onExportVaultMarkdown,
   onExportCurrentNoteMarkdown,
   onPrintCurrentNote,
+  onReloadWorkspace,
   onSetEditorWidth,
   onToggleModule,
 }: SettingsViewProps) {
@@ -64,6 +70,16 @@ export function SettingsView({
   const hasChanges = useMemo(() => {
     return configDraft !== configJson || cssDraft !== customCss
   }, [configDraft, configJson, cssDraft, customCss])
+
+  const notes = useMemo(() => {
+    return nodes
+      .filter((node): node is Note => node.type === 'note')
+      .map((note) => ({
+        ...note,
+        content: note.content ?? '[]',
+        tags: note.tags ?? [],
+      }))
+  }, [nodes])
 
   return (
     <section className="trace-scrollbar flex h-full w-full flex-1 overflow-y-auto bg-[var(--bg)] px-5 py-5 md:px-7 md:py-6">
@@ -86,6 +102,8 @@ export function SettingsView({
           onSetEditorWidth={onSetEditorWidth}
           onToggleModule={onToggleModule}
         />
+
+        <SyncSection notes={notes} onReloadWorkspace={onReloadWorkspace} />
 
         <CustomizationEditors
           configDraft={configDraft}

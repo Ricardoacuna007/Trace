@@ -73,6 +73,7 @@ interface AppShellProps {
   onPinNote: (noteId: string) => void
   onPrintCurrentNote: () => void
   onRefreshMarkdownDatabase: () => void
+  onReloadWorkspace: () => Promise<void>
   onReloadCustomization: () => void
   onSaveCustomization: (configJson: string, customCss: string) => void
   onSetActiveView: (view: AppViewMode) => void
@@ -160,6 +161,7 @@ export function AppShell({
   onPinNote,
   onPrintCurrentNote,
   onRefreshMarkdownDatabase,
+  onReloadWorkspace,
   onReloadCustomization,
   onSaveCustomization,
   onSetActiveView,
@@ -208,6 +210,7 @@ export function AppShell({
                 customizationSaving={customizationSaving}
                 ioWorking={ioWorking}
                 ioMessage={ioMessage}
+                nodes={nodes}
                 selectedNote={selectedNote}
                 editorWidth={editorWidth}
                 uiModules={uiModules}
@@ -217,6 +220,7 @@ export function AppShell({
                 onExportVaultMarkdown={onExportVaultMarkdown}
                 onExportCurrentNoteMarkdown={onExportCurrentNoteMarkdown}
                 onPrintCurrentNote={onPrintCurrentNote}
+                onReloadWorkspace={onReloadWorkspace}
                 onSetEditorWidth={onSetEditorWidth}
                 onToggleModule={onToggleModule}
               />
