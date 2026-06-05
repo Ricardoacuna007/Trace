@@ -9,6 +9,7 @@
     "check": "npm run lint && npm run test && npm run build && npm run server:prepare-web && npm run cargo:test && npm run cargo:clippy",
     "lint": "eslint .",
     "preview": "vite preview",
+    "e2e": "playwright test",
     "tauri": "tauri",
     "desktop:build:linux": "tauri build --ci --verbose --bundles deb appimage",
     "server:prepare-web": "node scripts/prepare-server-web.mjs",
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.60.0",
     "@tauri-apps/cli": "2.11.2",
     "@types/node": "^24.12.2",
     "@types/react": "^18.3.28",

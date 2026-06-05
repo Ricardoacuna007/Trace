@@ -89,8 +89,8 @@ export function WebSettings({ onBack, onLogout }: WebSettingsProps) {
       link.download = backupFilename(response.headers.get('content-disposition'))
       link.click()
       URL.revokeObjectURL(objectUrl)
-      setMessage('Backup descargado')
       await refreshSettings()
+      setMessage('Backup descargado')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo crear backup')
     } finally {
@@ -116,8 +116,8 @@ export function WebSettings({ onBack, onLogout }: WebSettingsProps) {
       setRestoreFile(null)
       setRestorePreview(null)
       setRestoreConfirm('')
-      setMessage('Backup restaurado')
       await refreshSettings()
+      setMessage('Backup restaurado')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo restaurar backup')
     } finally {
