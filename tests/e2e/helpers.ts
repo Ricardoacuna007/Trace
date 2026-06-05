@@ -18,7 +18,14 @@ export async function ensureSignedIn(page: Page): Promise<void> {
 
   const loginHeading = page.getByRole('heading', { name: 'Entrar a Trace' })
   if (await loginHeading.isVisible().catch(() => false)) {
-    await loginViaApi(page)
+    const token = await loginViaApi(page)
+    await page.route('**/api/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ token, user_id: 'e2e-admin' }),
+      })
+    })
     await page.goto('/')
   }
 
@@ -46,7 +53,7 @@ export async function accessToken(page: Page): Promise<string> {
   })
 }
 
-async function loginViaApi(page: Page): Promise<void> {
+async function loginViaApi(page: Page): Promise<string> {
   const response = await page.request.post('/api/auth/login', {
     data: {
       email: adminEmail,
@@ -54,18 +61,23 @@ async function loginViaApi(page: Page): Promise<void> {
     },
   })
   expect(response.ok()).toBe(true)
+  const body = await response.json() as { token?: unknown }
+  if (typeof body.token !== 'string') {
+    throw new Error('Login API E2E no devolvio token')
+  }
   const setCookie = response.headers()['set-cookie']
   const cookiePair = setCookie?.split(';')[0]
   const [name, value] = cookiePair?.split('=') ?? []
-  if (name && value) {
-    await page.context().addCookies([{
-      name,
-      value,
-      domain: '127.0.0.1',
-      path: '/api/auth',
-      httpOnly: true,
-      sameSite: 'Lax',
-      secure: false,
-    }])
+  if (!name || !value) {
+    throw new Error('Login API E2E no devolvio cookie de refresh')
   }
+  await page.context().addCookies([{
+    name,
+    value,
+    url: 'http://127.0.0.1:18080/api/auth/refresh',
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: false,
+  }])
+  return body.token
 }
