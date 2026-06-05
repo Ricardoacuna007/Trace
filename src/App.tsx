@@ -17,8 +17,13 @@ import { CommandPalette } from './app/shell/CommandPalette'
 import { ThemeInjector } from './app/shell/ThemeInjector'
 import { VaultSelector } from './app/shell/VaultSelector'
 import { normalizeWikiLinkTitle } from './features/notes-editor/wikiLinks'
+import { TraceWebApp } from './web/TraceWebApp'
 
-function App() {
+function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+function DesktopApp() {
   const {
     nodes,
     nodeTree,
@@ -384,6 +389,10 @@ function App() {
       />
     </main>
   )
+}
+
+function App() {
+  return isTauriRuntime() ? <DesktopApp /> : <TraceWebApp />
 }
 
 export default App
