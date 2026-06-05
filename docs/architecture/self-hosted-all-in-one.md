@@ -116,17 +116,27 @@ Implementado:
   - `POST /setup`
   - `GET /api/setup/status`
   - `POST /api/auth/login`
+  - middleware JWT para rutas `/api/*`
+  - API REST de notas
+  - API REST de relaciones
+  - `GET /api/graph`
+  - `POST /api/backup`
+  - `POST /api/restore`
   - SQLite en `--data-dir` / `TRACE_DATA_DIR`
   - migraciones automaticas al iniciar
   - usuario admin inicial
   - JWT firmado con secreto persistido en SQLite
+  - UI web minima en modo servidor
+  - headers HTTP de seguridad
 - `Dockerfile` y `docker-compose.yml` para `docker compose up -d`.
+- CI de Docker para construir la imagen y validar `/health`.
 
 Pendiente:
 
-- Middleware JWT para proteger rutas `/api`.
-- API HTTP completa de notas y grafo.
-- Backup/restore ZIP.
-- UI web real conectada a la API.
+- UI web self-host con experiencia visual equivalente al desktop.
+- Rate limiting para setup/login.
+- Refresh tokens y revocacion de sesiones.
+- Guia de reverse proxy con HTTPS.
+- Tests HTTP automatizados para auth, headers, backup y restore.
 - Push/pull desktop-servidor. Para v1 se mantiene la recomendacion de Modelo B:
   vaults independientes con operaciones explicitas antes de sync automatico.

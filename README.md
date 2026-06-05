@@ -214,3 +214,7 @@ Mapa de flujo y responsabilidades:
 Direccion self-hosted all-in-one:
 
 - `docs/architecture/self-hosted-all-in-one.md`
+
+Seguridad:
+
+- `docs/security-review.md`
