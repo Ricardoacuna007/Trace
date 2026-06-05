@@ -11,21 +11,28 @@ use argon2::{
     Argon2,
 };
 use axum::{
-    extract::State,
-    http::{header, HeaderValue, StatusCode, Uri},
+    body::Body,
+    extract::{Path, State},
+    http::{header, HeaderValue, Request, StatusCode, Uri},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
 use clap::Parser;
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use rand_core::OsRng;
 use rusqlite::{params, Connection, OptionalExtension};
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
-use trace_core::{auth::Claims, schema};
+use trace_core::{
+    auth::Claims,
+    graph,
+    notes::{self, CreateNoteInput, DeletedResponse, UpdateNoteInput},
+    schema,
+};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -81,6 +88,13 @@ struct AuthResponse {
     user_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConnectNotesRequest {
+    source_id: String,
+    target_ids: Vec<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -93,12 +107,29 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let state = initialize_state(args.data_dir)?;
 
+    let protected_api = Router::new()
+        .route("/api/notes", get(api_list_notes).post(api_create_note))
+        .route(
+            "/api/notes/:id",
+            get(api_get_note)
+                .put(api_update_note)
+                .delete(api_delete_note),
+        )
+        .route("/api/relations", get(api_list_relations))
+        .route("/api/relations/connect", post(api_connect_notes))
+        .route("/api/graph", get(api_graph))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_auth,
+        ));
+
     let app = Router::new()
         .route("/", get(index))
         .route("/setup", get(setup_page).post(setup))
         .route("/health", get(health))
         .route("/api/setup/status", get(setup_status))
         .route("/api/auth/login", post(login))
+        .merge(protected_api)
         .fallback(static_asset)
         .with_state(state)
         .layer(TraceLayer::new_for_http());
@@ -249,6 +280,121 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
     match login_user(&state, payload) {
         Ok(Some(auth)) => Json(auth).into_response(),
         Ok(None) => (StatusCode::UNAUTHORIZED, Json(error_body("Credenciales invalidas"))).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn require_auth(
+    State(state): State<AppState>,
+    mut request: Request<Body>,
+    next: Next,
+) -> Response {
+    let Some(token) = bearer_token(&request) else {
+        return unauthorized();
+    };
+
+    let validation = Validation::default();
+    let claims = match decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &validation,
+    ) {
+        Ok(token_data) => token_data.claims,
+        Err(error) => {
+            tracing::warn!("JWT invalido: {error}");
+            return unauthorized();
+        }
+    };
+
+    request.extensions_mut().insert(claims);
+    next.run(request).await
+}
+
+async fn api_list_notes(State(state): State<AppState>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::list_notes(&connection).context("No se pudieron listar notas")
+    }) {
+        Ok(notes) => Json(notes).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_get_note(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::get_note(&connection, &id).context("No se pudo leer nota")
+    }) {
+        Ok(Some(note)) => Json(note).into_response(),
+        Ok(None) => not_found("Nota no encontrada"),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_create_note(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateNoteInput>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::create_note(&connection, payload).context("No se pudo crear nota")
+    }) {
+        Ok(note) => (StatusCode::CREATED, Json(note)).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_update_note(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateNoteInput>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::update_note(&connection, &id, payload).context("No se pudo actualizar nota")
+    }) {
+        Ok(Some(note)) => Json(note).into_response(),
+        Ok(None) => not_found("Nota no encontrada"),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_delete_note(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::delete_note(&connection, &id).context("No se pudo eliminar nota")
+    }) {
+        Ok(true) => Json(DeletedResponse { deleted: true }).into_response(),
+        Ok(false) => not_found("Nota no encontrada"),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_list_relations(State(state): State<AppState>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::list_relations(&connection).context("No se pudieron listar relaciones")
+    }) {
+        Ok(relations) => Json(relations).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_connect_notes(
+    State(state): State<AppState>,
+    Json(payload): Json<ConnectNotesRequest>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|mut connection| {
+        notes::connect_notes(&mut connection, &payload.source_id, &payload.target_ids)
+            .context("No se pudieron conectar notas")
+    }) {
+        Ok(relations) => Json(relations).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_graph(State(state): State<AppState>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        let nodes = notes::list_notes(&connection).context("No se pudieron listar notas")?;
+        let relations =
+            notes::list_relations(&connection).context("No se pudieron listar relaciones")?;
+        Ok::<_, anyhow::Error>(graph::build_note_graph(&nodes, &relations))
+    }) {
+        Ok(graph) => Json(graph).into_response(),
         Err(error) => server_error(error),
     }
 }
@@ -423,6 +569,23 @@ fn unix_timestamp() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or_default()
+}
+
+fn bearer_token(request: &Request<Body>) -> Option<&str> {
+    let header = request.headers().get(header::AUTHORIZATION)?.to_str().ok()?;
+    header.strip_prefix("Bearer ")
+}
+
+fn unauthorized() -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(error_body("Token requerido o invalido")),
+    )
+        .into_response()
+}
+
+fn not_found(message: &str) -> Response {
+    (StatusCode::NOT_FOUND, Json(error_body(message))).into_response()
 }
 
 fn error_body(message: &str) -> serde_json::Value {
