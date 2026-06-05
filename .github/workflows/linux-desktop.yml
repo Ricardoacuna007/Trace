@@ -68,6 +68,16 @@ jobs:
           set -o pipefail
           npm run desktop:build:linux 2>&1 | tee target/linux-desktop-build.log
 
+      - name: Report Linux build failure
+        if: failure()
+        run: |
+          echo "### Linux desktop build log" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 160 target/linux-desktop-build.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          message="$(tail -n 80 target/linux-desktop-build.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')"
+          echo "::error title=Linux desktop build failed::$message"
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
