@@ -35,12 +35,23 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
         revoked_at INTEGER
       );
 
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id TEXT PRIMARY KEY,
+        event TEXT NOT NULL,
+        user_id TEXT,
+        ip TEXT,
+        detail TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+
       CREATE INDEX IF NOT EXISTS idx_nodes_parent_position ON nodes(parent_id, position);
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type);
       CREATE INDEX IF NOT EXISTS idx_note_relations_source ON note_relations(source_id);
       CREATE INDEX IF NOT EXISTS idx_note_relations_target ON note_relations(target_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+      CREATE INDEX IF NOT EXISTS idx_audit_log_event ON audit_log(event);
       ",
         )
         .map_err(|error| format!("No se pudo asegurar el esquema Trace: {error}"))?;
@@ -172,8 +183,10 @@ mod tests {
         assert!(table_exists(&connection, "nodes"));
         assert!(table_exists(&connection, "note_relations"));
         assert!(table_exists(&connection, "refresh_tokens"));
+        assert!(table_exists(&connection, "audit_log"));
         assert!(index_exists(&connection, "idx_nodes_parent_position"));
         assert!(index_exists(&connection, "idx_refresh_tokens_expires_at"));
+        assert!(index_exists(&connection, "idx_audit_log_created_at"));
         assert!(has_column(&connection, "nodes", "tags").expect("tags column check works"));
     }
 

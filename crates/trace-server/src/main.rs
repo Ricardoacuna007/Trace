@@ -1,3 +1,5 @@
+mod audit;
+
 use std::{
     collections::HashMap,
     fs::File,
@@ -15,12 +17,12 @@ use argon2::{
 };
 use axum::{
     body::{Body, Bytes},
-    extract::{DefaultBodyLimit, Path, State},
-    http::{header, HeaderValue, Request, StatusCode, Uri},
+    extract::{DefaultBodyLimit, Path, Query, State},
+    http::{header, HeaderMap, HeaderValue, Request, StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use chrono::Utc;
 use clap::Parser;
@@ -130,6 +132,12 @@ struct ConnectNotesRequest {
     target_ids: Vec<String>,
 }
 
+#[derive(Deserialize)]
+struct AuditLogQuery {
+    limit: Option<u32>,
+    offset: Option<u32>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RestoreResponse {
@@ -176,6 +184,7 @@ fn build_router(state: AppState) -> Router {
         .route("/api/graph", get(api_graph))
         .route("/api/backup", post(api_backup))
         .route("/api/restore", post(api_restore))
+        .route("/api/admin/audit-log", get(api_audit_log))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     Router::new()
@@ -325,7 +334,11 @@ async fn setup_status(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>) -> Response {
+async fn setup(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<SetupRequest>,
+) -> Response {
     let rate_limit_key = auth_rate_limit_key("setup", &payload.email);
     match allow_auth_attempt(&state, &rate_limit_key) {
         Ok(true) => {}
@@ -336,6 +349,13 @@ async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>)
     match create_admin(&state, payload) {
         Ok(auth) => {
             clear_auth_attempts(&state, &rate_limit_key);
+            log_audit_event(
+                &state,
+                "setup.completed",
+                Some(&auth.user_id),
+                &headers,
+                serde_json::json!({ "user_id": auth.user_id.clone() }),
+            );
             match create_refresh_token(&state, &auth.user_id) {
                 Ok(refresh_token) => with_refresh_cookie(
                     (StatusCode::CREATED, Json(auth)).into_response(),
@@ -352,7 +372,12 @@ async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>)
     }
 }
 
-async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>) -> Response {
+async fn login(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<LoginRequest>,
+) -> Response {
+    let email = payload.email.trim().to_lowercase();
     let rate_limit_key = auth_rate_limit_key("login", &payload.email);
     match allow_auth_attempt(&state, &rate_limit_key) {
         Ok(true) => {}
@@ -363,6 +388,13 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
     match login_user(&state, payload) {
         Ok(Some(auth)) => {
             clear_auth_attempts(&state, &rate_limit_key);
+            log_audit_event(
+                &state,
+                "auth.login_ok",
+                Some(&auth.user_id),
+                &headers,
+                serde_json::json!({ "email": email }),
+            );
             match create_refresh_token(&state, &auth.user_id) {
                 Ok(refresh_token) => {
                     with_refresh_cookie(Json(auth).into_response(), &refresh_token)
@@ -370,11 +402,20 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>)
                 Err(error) => server_error(error),
             }
         }
-        Ok(None) => (
-            StatusCode::UNAUTHORIZED,
-            Json(error_body("Credenciales invalidas")),
-        )
-            .into_response(),
+        Ok(None) => {
+            log_audit_event(
+                &state,
+                "auth.login_failed",
+                None,
+                &headers,
+                serde_json::json!({ "email": email }),
+            );
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(error_body("Credenciales invalidas")),
+            )
+                .into_response()
+        }
         Err(error) => server_error(error),
     }
 }
@@ -392,9 +433,19 @@ async fn refresh_auth(State(state): State<AppState>, request: Request<Body>) -> 
 }
 
 async fn logout(State(state): State<AppState>, request: Request<Body>) -> Response {
+    let headers = request.headers().clone();
     if let Some(raw_token) = refresh_cookie(&request) {
-        if let Err(error) = revoke_refresh_token(&state, raw_token) {
-            return server_error(error);
+        match revoke_refresh_token(&state, raw_token) {
+            Ok(user_id) => {
+                log_audit_event(
+                    &state,
+                    "auth.logout",
+                    user_id.as_deref(),
+                    &headers,
+                    serde_json::json!({}),
+                );
+            }
+            Err(error) => return server_error(error),
         }
     }
 
@@ -538,9 +589,20 @@ async fn api_graph(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn api_backup(State(state): State<AppState>) -> Response {
+async fn api_backup(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    headers: HeaderMap,
+) -> Response {
     match build_backup_zip(&state) {
         Ok(zip_bytes) => {
+            log_audit_event(
+                &state,
+                "backup.downloaded",
+                Some(&claims.sub),
+                &headers,
+                serde_json::json!({ "bytes": zip_bytes.len() }),
+            );
             let filename = format!("trace-backup-{}.zip", Utc::now().format("%Y%m%d%H%M%S"));
             let mut response = zip_bytes.into_response();
             response.headers_mut().insert(
@@ -560,9 +622,55 @@ async fn api_backup(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn api_restore(State(state): State<AppState>, body: Bytes) -> Response {
+async fn api_restore(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    log_audit_event(
+        &state,
+        "restore.started",
+        Some(&claims.sub),
+        &headers,
+        serde_json::json!({ "bytes": body.len() }),
+    );
     match restore_backup_zip(&state, &body) {
-        Ok(()) => Json(RestoreResponse { restored: true }).into_response(),
+        Ok(()) => {
+            log_audit_event(
+                &state,
+                "restore.completed",
+                Some(&claims.sub),
+                &headers,
+                serde_json::json!({}),
+            );
+            Json(RestoreResponse { restored: true }).into_response()
+        }
+        Err(error) => {
+            let message = error.to_string();
+            log_audit_event(
+                &state,
+                "restore.failed",
+                Some(&claims.sub),
+                &headers,
+                serde_json::json!({ "error": message }),
+            );
+            server_error(error)
+        }
+    }
+}
+
+async fn api_audit_log(
+    State(state): State<AppState>,
+    Query(query): Query<AuditLogQuery>,
+) -> Response {
+    let limit = query.limit.unwrap_or(100).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0);
+
+    match open_connection(&state.db_path)
+        .and_then(|connection| audit::list_events(&connection, limit, offset))
+    {
+        Ok(events) => Json(events).into_response(),
         Err(error) => server_error(error),
     }
 }
@@ -811,12 +919,20 @@ fn refresh_access_token(state: &AppState, raw_token: &str) -> Result<Option<Auth
     )?))
 }
 
-fn revoke_refresh_token(state: &AppState, raw_token: &str) -> Result<()> {
+fn revoke_refresh_token(state: &AppState, raw_token: &str) -> Result<Option<String>> {
     let Some(parts) = parse_refresh_token(raw_token) else {
-        return Ok(());
+        return Ok(None);
     };
 
     let connection = open_connection(&state.db_path)?;
+    let user_id = connection
+        .query_row(
+            "SELECT user_id FROM refresh_tokens WHERE id = ?1",
+            [parts.id.as_str()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .context("No se pudo leer usuario de refresh token")?;
     connection
         .execute(
             "UPDATE refresh_tokens
@@ -825,7 +941,7 @@ fn revoke_refresh_token(state: &AppState, raw_token: &str) -> Result<()> {
             params![unix_timestamp(), parts.id],
         )
         .context("No se pudo revocar refresh token")?;
-    Ok(())
+    Ok(user_id)
 }
 
 fn parse_refresh_token(raw_token: &str) -> Option<RefreshTokenParts> {
@@ -983,6 +1099,45 @@ fn refresh_cookie(request: &Request<Body>) -> Option<&str> {
         let (name, value) = part.trim().split_once('=')?;
         (name == REFRESH_COOKIE_NAME).then_some(value)
     })
+}
+
+fn log_audit_event(
+    state: &AppState,
+    event: &str,
+    user_id: Option<&str>,
+    headers: &HeaderMap,
+    detail: serde_json::Value,
+) {
+    let ip = request_ip(headers);
+    let result = open_connection(&state.db_path).and_then(|connection| {
+        audit::log_event(&connection, event, user_id, ip.as_deref(), detail)
+    });
+
+    if let Err(error) = result {
+        tracing::warn!("No se pudo registrar audit log {event}: {error:#}");
+    }
+}
+
+fn request_ip(headers: &HeaderMap) -> Option<String> {
+    header_first_value(headers, "x-forwarded-for")
+        .and_then(|value| {
+            value
+                .split(',')
+                .next()
+                .map(str::trim)
+                .filter(|candidate| !candidate.is_empty())
+                .map(ToOwned::to_owned)
+        })
+        .or_else(|| header_first_value(headers, "x-real-ip"))
+}
+
+fn header_first_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn refresh_cookie_header(token: &str) -> Result<HeaderValue> {
@@ -1149,6 +1304,64 @@ mod tests {
             .await
             .expect("notes responds");
         assert_eq!(notes.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn audit_log_records_auth_events() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+        let bad_login_body = r#"{
+            "email": "admin@example.com",
+            "password": "wrong-password"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let auth = response_body_json(setup).await;
+        let token = auth["token"].as_str().expect("token exists");
+
+        let failed_login = app
+            .clone()
+            .oneshot(test_request(
+                "POST",
+                "/api/auth/login",
+                Some(bad_login_body),
+            ))
+            .await
+            .expect("login responds");
+        assert_eq!(failed_login.status(), StatusCode::UNAUTHORIZED);
+
+        let audit_log = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/audit-log")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("audit log responds");
+        assert_eq!(audit_log.status(), StatusCode::OK);
+
+        let events = response_body_json(audit_log).await;
+        let names: Vec<&str> = events
+            .as_array()
+            .expect("audit log is an array")
+            .iter()
+            .filter_map(|event| event["event"].as_str())
+            .collect();
+
+        assert!(names.contains(&"setup.completed"));
+        assert!(names.contains(&"auth.login_failed"));
     }
 
     #[tokio::test]
