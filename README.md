@@ -75,6 +75,12 @@ La ruta simple para probar Trace en servidor es Docker:
 docker compose up -d
 ```
 
+Cuando exista un release publicado, tambien se podra usar la imagen GHCR:
+
+```bash
+docker run -d --name trace -p 8080:8080 -v trace_data:/data ghcr.io/ricardoacuna007/trace-server:latest
+```
+
 Despues abre:
 
 ```text

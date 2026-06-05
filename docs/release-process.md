@@ -29,6 +29,11 @@ El workflow `Build Linux Desktop` crea un release draft y adjunta:
 - `.deb`
 - `.AppImage`
 
+El workflow `Publish Docker Image` publica:
+
+- `ghcr.io/ricardoacuna007/trace-server:latest`
+- `ghcr.io/ricardoacuna007/trace-server:v0.1.0`
+
 ## Publicar
 
 1. Revisar el draft en GitHub Releases.
@@ -40,5 +45,4 @@ El workflow `Build Linux Desktop` crea un release draft y adjunta:
 
 - Adjuntar Windows MSI/NSIS.
 - Adjuntar binario `trace-server` Linux.
-- Publicar imagen Docker en GHCR.
 - Firmar artefactos.
