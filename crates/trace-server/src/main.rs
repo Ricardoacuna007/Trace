@@ -1,6 +1,8 @@
 use std::{
+    fs::File,
+    io::{Cursor, Read, Write},
     net::SocketAddr,
-    path::PathBuf,
+    path::{Path as StdPath, PathBuf},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -11,7 +13,7 @@ use argon2::{
     Argon2,
 };
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     extract::{Path, State},
     http::{header, HeaderValue, Request, StatusCode, Uri},
     middleware::{self, Next},
@@ -34,6 +36,7 @@ use trace_core::{
     schema,
 };
 use uuid::Uuid;
+use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 #[derive(Parser, Debug)]
 #[command(name = "trace-server")]
@@ -95,6 +98,12 @@ struct ConnectNotesRequest {
     target_ids: Vec<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RestoreResponse {
+    restored: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -118,6 +127,8 @@ async fn main() -> Result<()> {
         .route("/api/relations", get(api_list_relations))
         .route("/api/relations/connect", post(api_connect_notes))
         .route("/api/graph", get(api_graph))
+        .route("/api/backup", post(api_backup))
+        .route("/api/restore", post(api_restore))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_auth,
@@ -399,6 +410,36 @@ async fn api_graph(State(state): State<AppState>) -> Response {
     }
 }
 
+async fn api_backup(State(state): State<AppState>) -> Response {
+    match build_backup_zip(&state) {
+        Ok(zip_bytes) => {
+            let filename = format!(
+                "trace-backup-{}.zip",
+                Utc::now().format("%Y%m%d%H%M%S")
+            );
+            let mut response = zip_bytes.into_response();
+            response.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/zip"),
+            );
+            if let Ok(value) =
+                HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
+            {
+                response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
+            }
+            response
+        }
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_restore(State(state): State<AppState>, body: Bytes) -> Response {
+    match restore_backup_zip(&state, &body) {
+        Ok(()) => Json(RestoreResponse { restored: true }).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
 fn serve_index() -> Response {
     embedded_asset("index.html").unwrap_or_else(|| {
         (
@@ -562,6 +603,94 @@ fn build_auth_response(jwt_secret: &str, user_id: String, vault_id: String) -> R
     )
     .context("No se pudo firmar JWT")?;
     Ok(AuthResponse { token, user_id })
+}
+
+fn build_backup_zip(state: &AppState) -> Result<Vec<u8>> {
+    let connection = open_connection(&state.db_path)?;
+    connection
+        .execute_batch("PRAGMA wal_checkpoint(FULL);")
+        .context("No se pudo consolidar WAL antes del backup")?;
+    drop(connection);
+
+    let db_bytes = std::fs::read(&*state.db_path)
+        .with_context(|| format!("No se pudo leer {}", state.db_path.display()))?;
+
+    let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+    let options =
+        SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    writer
+        .start_file("trace.db", options)
+        .context("No se pudo iniciar archivo trace.db en ZIP")?;
+    writer
+        .write_all(&db_bytes)
+        .context("No se pudo escribir trace.db en ZIP")?;
+    let cursor = writer.finish().context("No se pudo cerrar ZIP de backup")?;
+    Ok(cursor.into_inner())
+}
+
+fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
+    if body.is_empty() {
+        anyhow::bail!("Backup vacio");
+    }
+
+    let mut archive =
+        ZipArchive::new(Cursor::new(body)).context("El backup no es un ZIP valido")?;
+    let mut db_entry = archive
+        .by_name("trace.db")
+        .context("El backup no contiene trace.db")?;
+
+    let restore_path = state.db_path.with_extension("db.restore");
+    let backup_path = state.db_path.with_extension("db.before-restore");
+    let mut restored_db = File::create(&restore_path)
+        .with_context(|| format!("No se pudo crear {}", restore_path.display()))?;
+    let mut buffer = Vec::new();
+    db_entry
+        .read_to_end(&mut buffer)
+        .context("No se pudo leer trace.db del ZIP")?;
+    restored_db
+        .write_all(&buffer)
+        .context("No se pudo escribir DB restaurada")?;
+    drop(restored_db);
+    drop(db_entry);
+    drop(archive);
+
+    let validation = open_connection(&restore_path)?;
+    schema::ensure_trace_schema(&validation).map_err(anyhow::Error::msg)?;
+    schema::ensure_markdown_index_schema(&validation).map_err(anyhow::Error::msg)?;
+    ensure_server_schema(&validation)?;
+    drop(validation);
+
+    remove_sqlite_sidecars(&state.db_path)?;
+    let _ = std::fs::remove_file(&backup_path);
+    if state.db_path.exists() {
+        std::fs::rename(&*state.db_path, &backup_path).with_context(|| {
+            format!(
+                "No se pudo preparar backup previo {}",
+                backup_path.display()
+            )
+        })?;
+    }
+
+    std::fs::rename(&restore_path, &*state.db_path).with_context(|| {
+        format!(
+            "No se pudo mover DB restaurada a {}",
+            state.db_path.display()
+        )
+    })?;
+
+    let _ = std::fs::remove_file(&backup_path);
+    Ok(())
+}
+
+fn remove_sqlite_sidecars(db_path: &StdPath) -> Result<()> {
+    for suffix in ["-wal", "-shm"] {
+        let path = PathBuf::from(format!("{}{}", db_path.display(), suffix));
+        if path.exists() {
+            std::fs::remove_file(&path)
+                .with_context(|| format!("No se pudo eliminar {}", path.display()))?;
+        }
+    }
+    Ok(())
 }
 
 fn unix_timestamp() -> i64 {
