@@ -147,6 +147,24 @@ struct RestoreResponse {
     restored: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupHistoryEntry {
+    id: String,
+    filename: String,
+    size_bytes: i64,
+    created_at: i64,
+    note: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RestorePreviewResponse {
+    notes: i64,
+    created_at: Option<i64>,
+    size_bytes: u64,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -186,7 +204,9 @@ fn build_router(state: AppState) -> Router {
         .route("/api/relations/connect", post(api_connect_notes))
         .route("/api/graph", get(api_graph))
         .route("/api/backup", post(api_backup))
+        .route("/api/backup/history", get(api_backup_history))
         .route("/api/restore", post(api_restore))
+        .route("/api/restore/preview", post(api_restore_preview))
         .route("/api/admin/audit-log", get(api_audit_log))
         .route("/api/auth/revoke-all", post(revoke_all_sessions))
         .route("/api/sync/push", post(sync::push))
@@ -622,7 +642,8 @@ async fn api_backup(
     Extension(claims): Extension<Claims>,
     headers: HeaderMap,
 ) -> Response {
-    match build_backup_zip(&state) {
+    let filename = format!("trace-backup-{}.zip", Utc::now().format("%Y%m%d%H%M%S"));
+    match build_backup_zip(&state, &filename) {
         Ok(zip_bytes) => {
             log_audit_event(
                 &state,
@@ -631,7 +652,6 @@ async fn api_backup(
                 &headers,
                 serde_json::json!({ "bytes": zip_bytes.len() }),
             );
-            let filename = format!("trace-backup-{}.zip", Utc::now().format("%Y%m%d%H%M%S"));
             let mut response = zip_bytes.into_response();
             response.headers_mut().insert(
                 header::CONTENT_TYPE,
@@ -646,6 +666,13 @@ async fn api_backup(
             }
             response
         }
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_backup_history(State(state): State<AppState>) -> Response {
+    match list_backup_history(&state) {
+        Ok(history) => Json(history).into_response(),
         Err(error) => server_error(error),
     }
 }
@@ -685,6 +712,13 @@ async fn api_restore(
             );
             restore_error_response(error)
         }
+    }
+}
+
+async fn api_restore_preview(State(state): State<AppState>, body: Bytes) -> Response {
+    match preview_restore_backup(&state, &body) {
+        Ok(preview) => Json(preview).into_response(),
+        Err(error) => restore_error_response(error),
     }
 }
 
@@ -1024,8 +1058,12 @@ fn clear_auth_attempts(state: &AppState, key: &str) {
     }
 }
 
-fn build_backup_zip(state: &AppState) -> Result<Vec<u8>> {
+fn build_backup_zip(state: &AppState, filename: &str) -> Result<Vec<u8>> {
     let connection = open_connection(&state.db_path)?;
+    let size_bytes = std::fs::metadata(&*state.db_path)
+        .map(|metadata| metadata.len() as i64)
+        .unwrap_or_default();
+    record_backup_history(&connection, filename, size_bytes)?;
     connection
         .execute_batch("PRAGMA wal_checkpoint(FULL);")
         .context("No se pudo consolidar WAL antes del backup")?;
@@ -1046,45 +1084,55 @@ fn build_backup_zip(state: &AppState) -> Result<Vec<u8>> {
     Ok(cursor.into_inner())
 }
 
+fn list_backup_history(state: &AppState) -> Result<Vec<BackupHistoryEntry>> {
+    let connection = open_connection(&state.db_path)?;
+    let mut statement = connection
+        .prepare(
+            "SELECT id, filename, size_bytes, created_at, note
+             FROM backup_history
+             ORDER BY created_at DESC
+             LIMIT 10",
+        )
+        .context("No se pudo preparar historial de backups")?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(BackupHistoryEntry {
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                size_bytes: row.get(2)?,
+                created_at: row.get(3)?,
+                note: row.get(4)?,
+            })
+        })
+        .context("No se pudo consultar historial de backups")?;
+
+    let mut history = Vec::new();
+    for row in rows {
+        history.push(row.context("No se pudo leer historial de backups")?);
+    }
+    Ok(history)
+}
+
+fn record_backup_history(connection: &Connection, filename: &str, size_bytes: i64) -> Result<()> {
+    connection
+        .execute(
+            "INSERT INTO backup_history (id, filename, size_bytes, created_at, note)
+             VALUES (?1, ?2, ?3, unixepoch(), NULL)",
+            params![Uuid::new_v4().to_string(), filename, size_bytes],
+        )
+        .context("No se pudo registrar backup_history")?;
+    Ok(())
+}
+
 fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
     if body.is_empty() {
         anyhow::bail!("Backup vacio");
     }
 
-    let mut archive =
-        ZipArchive::new(Cursor::new(body)).context("El backup no es un ZIP valido")?;
-    validate_restore_archive_limits(&mut archive)?;
-    let mut db_entry = archive
-        .by_name("trace.db")
-        .context("El backup no contiene trace.db")?;
-
-    if db_entry.size() > MAX_RESTORE_DB_BYTES {
-        anyhow::bail!("trace.db excede el tamano maximo permitido");
-    }
-
     let restore_path = state.db_path.with_extension("db.restore");
     let backup_path = state.db_path.with_extension("db.before-restore");
-    let mut restored_db = File::create(&restore_path)
-        .with_context(|| format!("No se pudo crear {}", restore_path.display()))?;
-    let mut buffer = Vec::new();
-    db_entry
-        .read_to_end(&mut buffer)
-        .context("No se pudo leer trace.db del ZIP")?;
-    if buffer.len() as u64 > MAX_RESTORE_DB_BYTES {
-        anyhow::bail!("trace.db excede el tamano maximo permitido");
-    }
-    restored_db
-        .write_all(&buffer)
-        .context("No se pudo escribir DB restaurada")?;
-    drop(restored_db);
-    drop(db_entry);
-    drop(archive);
-
-    let validation = open_connection(&restore_path)?;
-    schema::ensure_trace_schema(&validation).map_err(anyhow::Error::msg)?;
-    schema::ensure_markdown_index_schema(&validation).map_err(anyhow::Error::msg)?;
-    ensure_server_schema(&validation)?;
-    drop(validation);
+    write_restore_candidate(body, &restore_path)?;
+    validate_restore_database(&restore_path)?;
 
     remove_sqlite_sidecars(&state.db_path)?;
     let _ = std::fs::remove_file(&backup_path);
@@ -1106,6 +1154,77 @@ fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
 
     let _ = std::fs::remove_file(&backup_path);
     Ok(())
+}
+
+fn preview_restore_backup(state: &AppState, body: &[u8]) -> Result<RestorePreviewResponse> {
+    if body.is_empty() {
+        anyhow::bail!("Backup vacio");
+    }
+
+    let preview_path = state
+        .db_path
+        .with_extension(format!("db.preview-{}", Uuid::new_v4()));
+    let result = (|| {
+        write_restore_candidate(body, &preview_path)?;
+        let validation = validate_restore_database(&preview_path)?;
+        let notes = validation
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE type = 'note'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .context("No se pudieron contar notas del backup")?;
+        let created_at = validation
+            .query_row(
+                "SELECT created_at FROM backup_history ORDER BY created_at DESC LIMIT 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .context("No se pudo leer fecha de backup")?;
+        Ok(RestorePreviewResponse {
+            notes,
+            created_at,
+            size_bytes: body.len() as u64,
+        })
+    })();
+    let _ = std::fs::remove_file(&preview_path);
+    result
+}
+
+fn write_restore_candidate(body: &[u8], destination: &StdPath) -> Result<()> {
+    let mut archive =
+        ZipArchive::new(Cursor::new(body)).context("El backup no es un ZIP valido")?;
+    validate_restore_archive_limits(&mut archive)?;
+    let mut db_entry = archive
+        .by_name("trace.db")
+        .context("El backup no contiene trace.db")?;
+
+    if db_entry.size() > MAX_RESTORE_DB_BYTES {
+        anyhow::bail!("trace.db excede el tamano maximo permitido");
+    }
+
+    let mut restored_db = File::create(destination)
+        .with_context(|| format!("No se pudo crear {}", destination.display()))?;
+    let mut buffer = Vec::new();
+    db_entry
+        .read_to_end(&mut buffer)
+        .context("No se pudo leer trace.db del ZIP")?;
+    if buffer.len() as u64 > MAX_RESTORE_DB_BYTES {
+        anyhow::bail!("trace.db excede el tamano maximo permitido");
+    }
+    restored_db
+        .write_all(&buffer)
+        .context("No se pudo escribir DB restaurada")?;
+    Ok(())
+}
+
+fn validate_restore_database(path: &StdPath) -> Result<Connection> {
+    let validation = open_connection(&path.to_path_buf())?;
+    schema::ensure_trace_schema(&validation).map_err(anyhow::Error::msg)?;
+    schema::ensure_markdown_index_schema(&validation).map_err(anyhow::Error::msg)?;
+    ensure_server_schema(&validation)?;
+    Ok(validation)
 }
 
 fn validate_restore_archive_limits<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<()> {
@@ -1526,6 +1645,79 @@ mod tests {
             .filter_map(|event| event["event"].as_str())
             .collect();
         assert!(names.contains(&"restore.failed"));
+    }
+
+    #[tokio::test]
+    async fn backup_history_and_restore_preview_work() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let auth = response_body_json(setup).await;
+        let token = auth["token"].as_str().expect("token exists");
+
+        let backup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/backup")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("backup responds");
+        assert_eq!(backup.status(), StatusCode::OK);
+        let backup_body = to_bytes(backup.into_body(), usize::MAX)
+            .await
+            .expect("backup body is read");
+
+        let history = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/backup/history")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("history responds");
+        assert_eq!(history.status(), StatusCode::OK);
+        let history_json = response_body_json(history).await;
+        assert_eq!(history_json.as_array().expect("history array").len(), 1);
+        assert!(history_json[0]["filename"]
+            .as_str()
+            .expect("filename exists")
+            .starts_with("trace-backup-"));
+
+        let preview = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/restore/preview")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .header(header::CONTENT_TYPE, "application/zip")
+                    .body(Body::from(backup_body))
+                    .expect("request is built"),
+            )
+            .await
+            .expect("preview responds");
+        assert_eq!(preview.status(), StatusCode::OK);
+        let preview_json = response_body_json(preview).await;
+        assert_eq!(preview_json["notes"], 0);
+        assert!(preview_json["createdAt"].as_i64().is_some());
     }
 
     #[tokio::test]

@@ -23,6 +23,20 @@ interface AuditEvent {
   createdAt: number
 }
 
+interface BackupHistoryEntry {
+  id: string
+  filename: string
+  sizeBytes: number
+  createdAt: number
+  note?: string | null
+}
+
+interface RestorePreview {
+  notes: number
+  createdAt?: number | null
+  sizeBytes: number
+}
+
 const sectionClassName = 'rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg2)] p-4'
 const buttonClassName = 'inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg3)] px-3 py-2 text-xs font-medium text-[var(--t2)] transition-colors duration-150 hover:border-[var(--border2)] hover:text-[var(--t1)] disabled:cursor-not-allowed disabled:opacity-60'
 const dangerButtonClassName = 'inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[rgba(248,113,113,0.35)] bg-[rgba(248,113,113,0.1)] px-3 py-2 text-xs font-medium text-[var(--red)] transition-colors duration-150 hover:bg-[rgba(248,113,113,0.16)] disabled:cursor-not-allowed disabled:opacity-60'
@@ -30,13 +44,15 @@ const dangerButtonClassName = 'inline-flex items-center justify-center gap-1.5 r
 export function WebSettings({ onBack, onLogout }: WebSettingsProps) {
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [auditLog, setAuditLog] = useState<AuditEvent[]>([])
+  const [backupHistory, setBackupHistory] = useState<BackupHistoryEntry[]>([])
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
+  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null)
   const [restoreConfirm, setRestoreConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   const hasAccessToken = useMemo(() => (getAccessToken() ?? '').trim().length > 0, [])
-  const restoreReady = restoreFile !== null && restoreConfirm.trim() === 'RESTORE'
+  const restoreReady = restoreFile !== null && restorePreview !== null && restoreConfirm.trim() === 'RESTORE'
 
   useEffect(() => {
     void refreshSettings()
@@ -46,12 +62,14 @@ export function WebSettings({ onBack, onLogout }: WebSettingsProps) {
     setBusy(true)
     setMessage(null)
     try {
-      const [nextHealth, nextAuditLog] = await Promise.all([
+      const [nextHealth, nextAuditLog, nextBackupHistory] = await Promise.all([
         apiJson<HealthResponse>('/health'),
         apiJson<AuditEvent[]>('/api/admin/audit-log?limit=20'),
+        apiJson<BackupHistoryEntry[]>('/api/backup/history'),
       ])
       setHealth(nextHealth)
       setAuditLog(nextAuditLog)
+      setBackupHistory(nextBackupHistory)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo cargar settings')
     } finally {
@@ -96,11 +114,35 @@ export function WebSettings({ onBack, onLogout }: WebSettingsProps) {
         body: restoreFile,
       })
       setRestoreFile(null)
+      setRestorePreview(null)
       setRestoreConfirm('')
       setMessage('Backup restaurado')
       await refreshSettings()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo restaurar backup')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function previewRestore(file: File): Promise<void> {
+    setRestoreFile(file)
+    setRestorePreview(null)
+    setRestoreConfirm('')
+    setBusy(true)
+    setMessage(null)
+    try {
+      const response = await apiFetch('/api/restore/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/zip',
+        },
+        body: file,
+      })
+      setRestorePreview(await response.json() as RestorePreview)
+    } catch (error) {
+      setRestoreFile(null)
+      setMessage(error instanceof Error ? error.message : 'No se pudo leer preview del backup')
     } finally {
       setBusy(false)
     }
@@ -191,10 +233,34 @@ export function WebSettings({ onBack, onLogout }: WebSettingsProps) {
                 type="file"
                 accept=".zip,application/zip"
                 className="hidden"
-                onChange={(event) => setRestoreFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) {
+                    void previewRestore(file)
+                  }
+                }}
               />
             </label>
           </div>
+          <div className="mt-3 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)]">
+            {backupHistory.slice(0, 5).map((backup) => (
+              <div key={backup.id} className="grid gap-1 border-b border-[var(--border)] bg-[var(--bg3)] px-3 py-2 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_120px_160px]">
+                <span className="truncate text-xs text-[var(--t1)]">{backup.filename}</span>
+                <span className="font-mono text-[10px] text-[var(--t3)]">{formatBytes(backup.sizeBytes)}</span>
+                <span className="font-mono text-[10px] text-[var(--t3)]">{formatAuditTime(backup.createdAt)}</span>
+              </div>
+            ))}
+            {backupHistory.length === 0 ? (
+              <div className="bg-[var(--bg3)] px-3 py-3 text-xs text-[var(--t3)]">Sin backups registrados</div>
+            ) : null}
+          </div>
+          {restorePreview ? (
+            <div className="mt-3 rounded-[var(--radius-md)] border border-[rgba(245,158,11,0.28)] bg-[rgba(245,158,11,0.08)] px-3 py-2 text-xs text-[var(--t2)]">
+              Este backup tiene {restorePreview.notes} notas
+              {restorePreview.createdAt ? `, creado el ${formatAuditTime(restorePreview.createdAt)}` : ''}.
+              {' '}Esta accion reemplaza toda la base actual.
+            </div>
+          ) : null}
           <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px]">
             <input
               className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--t1)] outline-none focus:border-[var(--accent)]"
@@ -247,6 +313,16 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function formatAuditTime(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString()
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function backupFilename(contentDisposition: string | null): string {
