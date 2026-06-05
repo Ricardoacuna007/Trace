@@ -39,7 +39,7 @@ export function NoteMetaBar({
   onOpenConnectModal,
 }: NoteMetaBarProps) {
   return (
-    <div className="flex min-h-[44px] shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--bg)] px-12 py-3.5">
+    <div className="flex min-h-[44px] shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg)] px-3 py-3.5 md:px-12">
       {isPinned ? (
         <Pill>
           <Pin className="h-3.5 w-3.5 text-[var(--accent)]" />

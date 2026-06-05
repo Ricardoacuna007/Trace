@@ -89,7 +89,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className="trace-scrollbar flex h-full w-[var(--sidebar-w)] shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg2)]">
+    <aside className="trace-scrollbar hidden h-full w-[var(--sidebar-w)] shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg2)] lg:flex">
       <div className="border-b border-[var(--border)] p-2.5">
         <button
           type="button"

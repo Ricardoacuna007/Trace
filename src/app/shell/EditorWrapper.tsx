@@ -25,7 +25,7 @@ export function EditorWrapper({
     : 'mx-auto w-full max-w-[820px]'
 
   return (
-    <section className="trace-scrollbar min-h-0 flex-1 overflow-y-auto bg-[var(--bg)] px-8 py-3 md:px-12">
+    <section className="trace-scrollbar min-h-0 flex-1 overflow-y-auto bg-[var(--bg)] px-0 py-3 md:px-12">
       <div className={`flex min-h-full flex-col ${contentWidthClassName}`}>
         <input
           value={note.title}
