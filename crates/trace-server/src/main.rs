@@ -133,6 +133,21 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let state = initialize_state(args.data_dir)?;
 
+    let app = build_router(state);
+
+    let listener = tokio::net::TcpListener::bind(args.bind)
+        .await
+        .with_context(|| format!("No se pudo abrir servidor en {}", args.bind))?;
+
+    tracing::info!("trace-server listening on http://{}", args.bind);
+    axum::serve(listener, app)
+        .await
+        .context("trace-server se detuvo inesperadamente")?;
+
+    Ok(())
+}
+
+fn build_router(state: AppState) -> Router {
     let protected_api = Router::new()
         .route("/api/notes", get(api_list_notes).post(api_create_note))
         .route(
@@ -148,7 +163,7 @@ async fn main() -> Result<()> {
         .route("/api/restore", post(api_restore))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
-    let app = Router::new()
+    Router::new()
         .route("/", get(index))
         .route("/setup", get(setup_page).post(setup))
         .route("/health", get(health))
@@ -159,18 +174,7 @@ async fn main() -> Result<()> {
         .with_state(state)
         .layer(middleware::from_fn(security_headers))
         .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
-        .layer(TraceLayer::new_for_http());
-
-    let listener = tokio::net::TcpListener::bind(args.bind)
-        .await
-        .with_context(|| format!("No se pudo abrir servidor en {}", args.bind))?;
-
-    tracing::info!("trace-server listening on http://{}", args.bind);
-    axum::serve(listener, app)
-        .await
-        .context("trace-server se detuvo inesperadamente")?;
-
-    Ok(())
+        .layer(TraceLayer::new_for_http())
 }
 
 fn initialize_state(data_dir: PathBuf) -> Result<AppState> {
@@ -845,6 +849,25 @@ fn server_error(error: anyhow::Error) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::to_bytes;
+    use tower::ServiceExt;
+
+    fn test_request(method: &str, uri: &str, body: Option<&str>) -> Request<Body> {
+        let builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header(header::CONTENT_TYPE, "application/json");
+        builder
+            .body(Body::from(body.unwrap_or_default().to_string()))
+            .expect("request is built")
+    }
+
+    async fn response_body_json(response: Response) -> serde_json::Value {
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body is read");
+        serde_json::from_slice(&body).expect("body is json")
+    }
 
     fn test_state() -> AppState {
         AppState {
@@ -852,6 +875,11 @@ mod tests {
             jwt_secret: Arc::new("test-secret".to_string()),
             auth_attempts: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    fn initialized_test_state() -> AppState {
+        let data_dir = std::env::temp_dir().join(format!("trace-server-test-{}", Uuid::new_v4()));
+        initialize_state(data_dir).expect("state is initialized")
     }
 
     #[test]
@@ -868,5 +896,106 @@ mod tests {
         clear_auth_attempts(&state, &key);
 
         assert!(allow_auth_attempt(&state, &key).expect("attempts are cleared"));
+    }
+
+    #[tokio::test]
+    async fn app_sets_security_headers_and_requires_auth() {
+        let app = build_router(initialized_test_state());
+
+        let health = app
+            .clone()
+            .oneshot(test_request("GET", "/health", None))
+            .await
+            .expect("health responds");
+        assert_eq!(health.status(), StatusCode::OK);
+        assert!(health
+            .headers()
+            .contains_key(header::CONTENT_SECURITY_POLICY));
+        assert_eq!(
+            health.headers().get("x-frame-options"),
+            Some(&HeaderValue::from_static("DENY"))
+        );
+
+        let notes = app
+            .oneshot(test_request("GET", "/api/notes", None))
+            .await
+            .expect("api responds");
+        assert_eq!(notes.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn setup_login_and_protected_notes_api_work() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let auth = response_body_json(setup).await;
+        let token = auth["token"].as_str().expect("token exists");
+
+        let notes = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/notes")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("notes responds");
+        assert_eq!(notes.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn login_is_rate_limited_after_failed_attempts() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+        let bad_login_body = r#"{
+            "email": "admin@example.com",
+            "password": "wrong-password"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+
+        for _ in 0..AUTH_RATE_LIMIT_MAX_ATTEMPTS {
+            let response = app
+                .clone()
+                .oneshot(test_request(
+                    "POST",
+                    "/api/auth/login",
+                    Some(bad_login_body),
+                ))
+                .await
+                .expect("login responds");
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+
+        let limited = app
+            .oneshot(test_request(
+                "POST",
+                "/api/auth/login",
+                Some(bad_login_body),
+            ))
+            .await
+            .expect("limited login responds");
+        assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
     }
 }
