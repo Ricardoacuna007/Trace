@@ -3,7 +3,7 @@ mod audit;
 use std::{
     collections::HashMap,
     fs::File,
-    io::{Cursor, Read, Write},
+    io::{Cursor, Read, Seek, Write},
     net::SocketAddr,
     path::{Path as StdPath, PathBuf},
     sync::{Arc, Mutex},
@@ -66,6 +66,8 @@ struct WebAssets;
 const FALLBACK_INDEX_HTML: &str = include_str!("../web/index.html");
 const MAX_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
 const MAX_RESTORE_DB_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_RESTORE_ARCHIVE_FILES: usize = 10_000;
+const MAX_RESTORE_UNCOMPRESSED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const AUTH_RATE_LIMIT_MAX_ATTEMPTS: usize = 8;
 const AUTH_RATE_LIMIT_WINDOW_SECONDS: i64 = 15 * 60;
 const ACCESS_TOKEN_TTL_SECONDS: i64 = 15 * 60;
@@ -655,7 +657,7 @@ async fn api_restore(
                 &headers,
                 serde_json::json!({ "error": message }),
             );
-            server_error(error)
+            restore_error_response(error)
         }
     }
 }
@@ -1012,6 +1014,7 @@ fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
 
     let mut archive =
         ZipArchive::new(Cursor::new(body)).context("El backup no es un ZIP valido")?;
+    validate_restore_archive_limits(&mut archive)?;
     let mut db_entry = archive
         .by_name("trace.db")
         .context("El backup no contiene trace.db")?;
@@ -1063,6 +1066,31 @@ fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
     })?;
 
     let _ = std::fs::remove_file(&backup_path);
+    Ok(())
+}
+
+fn validate_restore_archive_limits<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<()> {
+    if archive.len() > MAX_RESTORE_ARCHIVE_FILES {
+        anyhow::bail!(
+            "El backup excede el limite de {} archivos",
+            MAX_RESTORE_ARCHIVE_FILES
+        );
+    }
+
+    let mut total_uncompressed = 0_u64;
+    for index in 0..archive.len() {
+        let file = archive
+            .by_index(index)
+            .context("No se pudo inspeccionar archivo del backup")?;
+        total_uncompressed = total_uncompressed
+            .checked_add(file.size())
+            .context("El tamano descomprimido del backup no es valido")?;
+
+        if total_uncompressed > MAX_RESTORE_UNCOMPRESSED_BYTES {
+            anyhow::bail!("El backup excede el limite de 2 GiB descomprimido");
+        }
+    }
+
     Ok(())
 }
 
@@ -1197,6 +1225,27 @@ fn server_error(error: anyhow::Error) -> Response {
         .into_response()
 }
 
+fn restore_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if is_restore_bad_request(&message) {
+        return (StatusCode::BAD_REQUEST, Json(error_body(&message))).into_response();
+    }
+
+    server_error(error)
+}
+
+fn is_restore_bad_request(message: &str) -> bool {
+    [
+        "Backup vacio",
+        "El backup no es un ZIP valido",
+        "El backup no contiene trace.db",
+        "trace.db excede el tamano maximo permitido",
+        "El backup excede el limite",
+    ]
+    .iter()
+    .any(|prefix| message.starts_with(prefix))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1231,6 +1280,20 @@ mod tests {
     fn initialized_test_state() -> AppState {
         let data_dir = std::env::temp_dir().join(format!("trace-server-test-{}", Uuid::new_v4()));
         initialize_state(data_dir).expect("state is initialized")
+    }
+
+    fn zip_with_empty_files(count: usize) -> Vec<u8> {
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+        for index in 0..count {
+            writer
+                .start_file(format!("entries/{index}.txt"), options)
+                .expect("zip entry is started");
+        }
+
+        writer.finish().expect("zip is finished").into_inner()
     }
 
     #[test]
@@ -1362,6 +1425,68 @@ mod tests {
 
         assert!(names.contains(&"setup.completed"));
         assert!(names.contains(&"auth.login_failed"));
+    }
+
+    #[tokio::test]
+    async fn restore_rejects_zip_with_too_many_files_and_logs_failure() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let auth = response_body_json(setup).await;
+        let token = auth["token"].as_str().expect("token exists");
+        let oversized_zip = zip_with_empty_files(MAX_RESTORE_ARCHIVE_FILES + 1);
+
+        let restore = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/restore")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .header(header::CONTENT_TYPE, "application/zip")
+                    .body(Body::from(oversized_zip))
+                    .expect("request is built"),
+            )
+            .await
+            .expect("restore responds");
+        assert_eq!(restore.status(), StatusCode::BAD_REQUEST);
+        let restore_error = response_body_json(restore).await;
+        assert!(restore_error["error"]
+            .as_str()
+            .expect("error is present")
+            .contains("10000 archivos"));
+
+        let audit_log = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/audit-log")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("audit log responds");
+        assert_eq!(audit_log.status(), StatusCode::OK);
+
+        let events = response_body_json(audit_log).await;
+        let names: Vec<&str> = events
+            .as_array()
+            .expect("audit log is an array")
+            .iter()
+            .filter_map(|event| event["event"].as_str())
+            .collect();
+        assert!(names.contains(&"restore.failed"));
     }
 
     #[tokio::test]
