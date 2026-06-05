@@ -188,6 +188,7 @@ fn build_router(state: AppState) -> Router {
         .route("/api/backup", post(api_backup))
         .route("/api/restore", post(api_restore))
         .route("/api/admin/audit-log", get(api_audit_log))
+        .route("/api/auth/revoke-all", post(revoke_all_sessions))
         .route("/api/sync/push", post(sync::push))
         .route("/api/sync/pull", get(sync::pull))
         .route("/api/sync/status", get(sync::status))
@@ -457,6 +458,26 @@ async fn logout(State(state): State<AppState>, request: Request<Body>) -> Respon
     }
 
     with_clear_refresh_cookie(StatusCode::NO_CONTENT.into_response())
+}
+
+async fn revoke_all_sessions(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    headers: HeaderMap,
+) -> Response {
+    match revoke_all_refresh_tokens(&state, &claims.sub) {
+        Ok(revoked) => {
+            log_audit_event(
+                &state,
+                "auth.revoke_all",
+                Some(&claims.sub),
+                &headers,
+                serde_json::json!({ "revoked": revoked }),
+            );
+            with_clear_refresh_cookie(StatusCode::NO_CONTENT.into_response())
+        }
+        Err(error) => server_error(error),
+    }
 }
 
 async fn require_auth(
@@ -949,6 +970,19 @@ fn revoke_refresh_token(state: &AppState, raw_token: &str) -> Result<Option<Stri
         )
         .context("No se pudo revocar refresh token")?;
     Ok(user_id)
+}
+
+fn revoke_all_refresh_tokens(state: &AppState, user_id: &str) -> Result<usize> {
+    let connection = open_connection(&state.db_path)?;
+    let changed = connection
+        .execute(
+            "UPDATE refresh_tokens
+             SET revoked_at = ?1
+             WHERE user_id = ?2 AND revoked_at IS NULL",
+            params![unix_timestamp(), user_id],
+        )
+        .context("No se pudieron revocar sesiones")?;
+    Ok(changed)
 }
 
 fn parse_refresh_token(raw_token: &str) -> Option<RefreshTokenParts> {
@@ -1687,6 +1721,62 @@ mod tests {
             .await
             .expect("refresh responds");
         assert_eq!(revoked_refresh.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn revoke_all_sessions_invalidates_refresh_cookie() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let cookie = setup
+            .headers()
+            .get(header::SET_COOKIE)
+            .expect("refresh cookie is set")
+            .to_str()
+            .expect("cookie is valid")
+            .split(';')
+            .next()
+            .expect("cookie pair exists")
+            .to_string();
+        let auth = response_body_json(setup).await;
+        let token = auth["token"].as_str().expect("token exists");
+
+        let revoke_all = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/revoke-all")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("revoke-all responds");
+        assert_eq!(revoke_all.status(), StatusCode::NO_CONTENT);
+
+        let refresh = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/refresh")
+                    .header(header::COOKIE, cookie)
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("refresh responds");
+        assert_eq!(refresh.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

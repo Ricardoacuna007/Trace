@@ -15,6 +15,7 @@ import { AppLoading } from './shell/AppLoading'
 import { AppShell } from './shell/AppShell'
 import { CommandPalette } from './shell/CommandPalette'
 import { ThemeInjector } from './shell/ThemeInjector'
+import { WebSettings } from './WebSettings'
 
 type AuthMode = 'loading' | 'setup' | 'login' | 'app'
 
@@ -79,6 +80,7 @@ function blocksToContent(blocks: Block[]): string {
 export function WebApp() {
   const saveTimerRef = useRef<number | null>(null)
   const queuedNoteRef = useRef<Note | null>(null)
+  const [path, setPath] = useState(() => window.location.pathname)
   const [mode, setMode] = useState<AuthMode>('loading')
   const [form, setForm] = useState<FormState>({
     workspaceName: 'Trace',
@@ -213,6 +215,17 @@ export function WebApp() {
   }, [loadWorkspace])
 
   useEffect(() => {
+    const handlePopState = () => setPath(window.location.pathname)
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  const navigate = useCallback((nextPath: string) => {
+    window.history.pushState(null, '', nextPath)
+    setPath(nextPath)
+  }, [])
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
@@ -343,7 +356,8 @@ export function WebApp() {
     setRelations([])
     setSelectedNodeId(null)
     setMode('login')
-  }, [])
+    navigate('/')
+  }, [navigate])
 
   if (mode === 'loading') {
     return <AppLoading configJson={DEFAULT_TRACE_CONFIG_JSON} customCss="" />
@@ -415,6 +429,15 @@ export function WebApp() {
     )
   }
 
+  if (path === '/settings') {
+    return (
+      <main className="flex h-full flex-col">
+        <ThemeInjector configJson={DEFAULT_TRACE_CONFIG_JSON} customCss="" />
+        <WebSettings onBack={() => navigate('/')} onLogout={logout} />
+      </main>
+    )
+  }
+
   return (
     <main className="flex h-full flex-col">
       <ThemeInjector configJson={DEFAULT_TRACE_CONFIG_JSON} customCss="" />
@@ -430,6 +453,10 @@ export function WebApp() {
         onCreateNote={() => void createNote()}
         onSwitchView={(modeName) => {
           if (modeName === 'settings' || modeName === 'database') {
+            if (modeName === 'settings') {
+              navigate('/settings')
+              return
+            }
             setViewMode(modeName)
             return
           }
@@ -437,7 +464,7 @@ export function WebApp() {
           setViewMode(modeName)
         }}
         onOpenConnect={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
-        onOpenSettings={() => setViewMode('settings')}
+        onOpenSettings={() => navigate('/settings')}
         onExportMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}
       />
       <AppErrorBanner error={message} />
