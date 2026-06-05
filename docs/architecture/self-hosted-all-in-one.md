@@ -128,13 +128,13 @@ Implementado:
   - JWT firmado con secreto persistido en SQLite
   - UI web minima en modo servidor
   - headers HTTP de seguridad
+  - rate limiting basico para setup/login
 - `Dockerfile` y `docker-compose.yml` para `docker compose up -d`.
 - CI de Docker para construir la imagen y validar `/health`.
 
 Pendiente:
 
 - UI web self-host con experiencia visual equivalente al desktop.
-- Rate limiting para setup/login.
 - Refresh tokens y revocacion de sesiones.
 - Guia de reverse proxy con HTTPS.
 - Tests HTTP automatizados para auth, headers, backup y restore.

@@ -1,9 +1,10 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{Cursor, Read, Write},
     net::SocketAddr,
     path::{Path as StdPath, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -53,6 +54,7 @@ struct Args {
 struct AppState {
     db_path: Arc<PathBuf>,
     jwt_secret: Arc<String>,
+    auth_attempts: Arc<Mutex<HashMap<String, Vec<i64>>>>,
 }
 
 #[derive(RustEmbed)]
@@ -62,6 +64,8 @@ struct WebAssets;
 const FALLBACK_INDEX_HTML: &str = include_str!("../web/index.html");
 const MAX_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
 const MAX_RESTORE_DB_BYTES: u64 = 256 * 1024 * 1024;
+const AUTH_RATE_LIMIT_MAX_ATTEMPTS: usize = 8;
+const AUTH_RATE_LIMIT_WINDOW_SECONDS: i64 = 15 * 60;
 const CONTENT_SECURITY_POLICY: &str = concat!(
     "default-src 'self'; ",
     "script-src 'self'; ",
@@ -183,6 +187,7 @@ fn initialize_state(data_dir: PathBuf) -> Result<AppState> {
     Ok(AppState {
         db_path: Arc::new(db_path),
         jwt_secret: Arc::new(jwt_secret),
+        auth_attempts: Arc::new(Mutex::new(HashMap::new())),
     })
 }
 
@@ -289,8 +294,18 @@ async fn setup_status(State(state): State<AppState>) -> Response {
 }
 
 async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>) -> Response {
+    let rate_limit_key = auth_rate_limit_key("setup", &payload.email);
+    match allow_auth_attempt(&state, &rate_limit_key) {
+        Ok(true) => {}
+        Ok(false) => return too_many_requests("Demasiados intentos de setup"),
+        Err(error) => return server_error(error),
+    }
+
     match create_admin(&state, payload) {
-        Ok(auth) => (StatusCode::CREATED, Json(auth)).into_response(),
+        Ok(auth) => {
+            clear_auth_attempts(&state, &rate_limit_key);
+            (StatusCode::CREATED, Json(auth)).into_response()
+        }
         Err(SetupError::AlreadyConfigured) => StatusCode::NOT_FOUND.into_response(),
         Err(SetupError::BadRequest(message)) => {
             (StatusCode::BAD_REQUEST, Json(error_body(&message))).into_response()
@@ -300,8 +315,18 @@ async fn setup(State(state): State<AppState>, Json(payload): Json<SetupRequest>)
 }
 
 async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>) -> Response {
+    let rate_limit_key = auth_rate_limit_key("login", &payload.email);
+    match allow_auth_attempt(&state, &rate_limit_key) {
+        Ok(true) => {}
+        Ok(false) => return too_many_requests("Demasiados intentos de login"),
+        Err(error) => return server_error(error),
+    }
+
     match login_user(&state, payload) {
-        Ok(Some(auth)) => Json(auth).into_response(),
+        Ok(Some(auth)) => {
+            clear_auth_attempts(&state, &rate_limit_key);
+            Json(auth).into_response()
+        }
         Ok(None) => (
             StatusCode::UNAUTHORIZED,
             Json(error_body("Credenciales invalidas")),
@@ -650,6 +675,34 @@ fn build_auth_response(
     Ok(AuthResponse { token, user_id })
 }
 
+fn auth_rate_limit_key(kind: &str, email: &str) -> String {
+    format!("{kind}:{}", email.trim().to_lowercase())
+}
+
+fn allow_auth_attempt(state: &AppState, key: &str) -> Result<bool> {
+    let now = unix_timestamp();
+    let cutoff = now - AUTH_RATE_LIMIT_WINDOW_SECONDS;
+    let mut attempts = state
+        .auth_attempts
+        .lock()
+        .map_err(|_| anyhow::anyhow!("Rate limiter no disponible"))?;
+    let entries = attempts.entry(key.to_string()).or_default();
+    entries.retain(|attempt| *attempt >= cutoff);
+
+    if entries.len() >= AUTH_RATE_LIMIT_MAX_ATTEMPTS {
+        return Ok(false);
+    }
+
+    entries.push(now);
+    Ok(true)
+}
+
+fn clear_auth_attempts(state: &AppState, key: &str) {
+    if let Ok(mut attempts) = state.auth_attempts.lock() {
+        attempts.remove(key);
+    }
+}
+
 fn build_backup_zip(state: &AppState) -> Result<Vec<u8>> {
     let connection = open_connection(&state.db_path)?;
     connection
@@ -768,6 +821,10 @@ fn unauthorized() -> Response {
         .into_response()
 }
 
+fn too_many_requests(message: &str) -> Response {
+    (StatusCode::TOO_MANY_REQUESTS, Json(error_body(message))).into_response()
+}
+
 fn not_found(message: &str) -> Response {
     (StatusCode::NOT_FOUND, Json(error_body(message))).into_response()
 }
@@ -783,4 +840,33 @@ fn server_error(error: anyhow::Error) -> Response {
         Json(error_body("Error interno del servidor")),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_state() -> AppState {
+        AppState {
+            db_path: Arc::new(PathBuf::from("test.db")),
+            jwt_secret: Arc::new("test-secret".to_string()),
+            auth_attempts: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    #[test]
+    fn rate_limit_blocks_after_max_attempts_and_clears() {
+        let state = test_state();
+        let key = auth_rate_limit_key("login", "ADMIN@EXAMPLE.COM");
+
+        for _ in 0..AUTH_RATE_LIMIT_MAX_ATTEMPTS {
+            assert!(allow_auth_attempt(&state, &key).expect("attempt is recorded"));
+        }
+
+        assert!(!allow_auth_attempt(&state, &key).expect("limit is checked"));
+
+        clear_auth_attempts(&state, &key);
+
+        assert!(allow_auth_attempt(&state, &key).expect("attempts are cleared"));
+    }
 }

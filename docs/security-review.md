@@ -28,6 +28,7 @@ segura para uso personal, LAN o despliegue detras de un reverse proxy con HTTPS.
   - `/api/graph`
   - `/api/backup`
   - `/api/restore`
+- Rate limiting basico en memoria para `/setup` y `/api/auth/login`.
 - Headers de seguridad en respuestas HTTP:
   - `Content-Security-Policy`
   - `X-Content-Type-Options: nosniff`
@@ -45,7 +46,6 @@ segura para uso personal, LAN o despliegue detras de un reverse proxy con HTTPS.
 
 - No hay TLS nativo en `trace-server`. Si se expone fuera de localhost/LAN, debe
   ir detras de un reverse proxy con HTTPS.
-- No hay rate limiting en `/api/auth/login` ni en `/setup`.
 - El token JWT vive en `localStorage` en el frontend web. La CSP reduce riesgo,
   pero una vulnerabilidad XSS podria robarlo.
 - No hay refresh tokens ni revocacion de sesiones.
@@ -75,7 +75,6 @@ Para exponer a internet:
 
 Prioridad 0 antes de declarar un release publico:
 
-- Rate limiting basico para `/api/auth/login` y `/setup`.
 - Tests HTTP automatizados para headers de seguridad, auth y restore.
 - Guia de reverse proxy con HTTPS.
 - Confirmar Docker CI verde con smoke test de `/health`.
