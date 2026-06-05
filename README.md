@@ -218,3 +218,8 @@ Direccion self-hosted all-in-one:
 Seguridad:
 
 - `docs/security-review.md`
+
+Versionado y releases:
+
+- `CHANGELOG.md`
+- `docs/release-process.md`
