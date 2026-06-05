@@ -1,4 +1,5 @@
 mod audit;
+mod sync;
 
 use std::{
     collections::HashMap,
@@ -187,6 +188,9 @@ fn build_router(state: AppState) -> Router {
         .route("/api/backup", post(api_backup))
         .route("/api/restore", post(api_restore))
         .route("/api/admin/audit-log", get(api_audit_log))
+        .route("/api/sync/push", post(sync::push))
+        .route("/api/sync/pull", get(sync::pull))
+        .route("/api/sync/status", get(sync::status))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     Router::new()
@@ -1487,6 +1491,131 @@ mod tests {
             .filter_map(|event| event["event"].as_str())
             .collect();
         assert!(names.contains(&"restore.failed"));
+    }
+
+    #[tokio::test]
+    async fn sync_push_pull_status_and_conflicts_work() {
+        let app = build_router(initialized_test_state());
+        let setup_body = r#"{
+            "workspace_name": "Trace Test",
+            "email": "admin@example.com",
+            "password": "password123"
+        }"#;
+
+        let setup = app
+            .clone()
+            .oneshot(test_request("POST", "/setup", Some(setup_body)))
+            .await
+            .expect("setup responds");
+        assert_eq!(setup.status(), StatusCode::CREATED);
+        let auth = response_body_json(setup).await;
+        let token = auth["token"].as_str().expect("token exists");
+
+        let note = serde_json::json!({
+            "id": "note-sync-client",
+            "title": "Synced note",
+            "type": "note",
+            "parentId": null,
+            "content": "[]",
+            "icon": "file-text",
+            "tags": [],
+            "position": 0,
+            "updatedAt": "2999-01-01T00:00:00+00:00"
+        });
+        let push_body = serde_json::json!({
+            "notes": [note.clone()],
+            "since": 0
+        });
+
+        let push = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/sync/push")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(push_body.to_string()))
+                    .expect("request is built"),
+            )
+            .await
+            .expect("push responds");
+        assert_eq!(push.status(), StatusCode::OK);
+        let push_json = response_body_json(push).await;
+        assert_eq!(push_json["accepted"][0], "note-sync-client");
+        assert_eq!(
+            push_json["conflicts"].as_array().expect("conflicts").len(),
+            0
+        );
+
+        let pull = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/sync/pull?since=0")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("pull responds");
+        assert_eq!(pull.status(), StatusCode::OK);
+        let pull_json = response_body_json(pull).await;
+        assert!(pull_json["notes"]
+            .as_array()
+            .expect("notes")
+            .iter()
+            .any(|item| item["id"] == "note-sync-client"));
+
+        let stale_note = serde_json::json!({
+            "id": "note-sync-client",
+            "title": "Older desktop copy",
+            "type": "note",
+            "parentId": null,
+            "content": "[]",
+            "icon": "file-text",
+            "tags": [],
+            "position": 0,
+            "updatedAt": "1999-01-01T00:00:00+00:00"
+        });
+        let conflict_body = serde_json::json!({
+            "notes": [stale_note],
+            "since": 0
+        });
+        let conflict = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/sync/push")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(conflict_body.to_string()))
+                    .expect("request is built"),
+            )
+            .await
+            .expect("conflict push responds");
+        assert_eq!(conflict.status(), StatusCode::OK);
+        let conflict_json = response_body_json(conflict).await;
+        assert_eq!(conflict_json["conflicts"][0]["noteId"], "note-sync-client");
+
+        let status = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/sync/status")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .expect("request is built"),
+            )
+            .await
+            .expect("status responds");
+        assert_eq!(status.status(), StatusCode::OK);
+        let status_json = response_body_json(status).await;
+        assert!(status_json["lastPush"].as_i64().is_some());
+        assert!(status_json["lastPull"].as_i64().is_some());
+        assert_eq!(status_json["pendingConflicts"], 1);
     }
 
     #[tokio::test]
