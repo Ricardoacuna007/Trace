@@ -14,6 +14,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   linux-desktop:
     name: Linux desktop bundles
@@ -60,7 +63,10 @@ jobs:
         run: npm run check
 
       - name: Build Linux bundles
-        run: npm run desktop:build:linux
+        run: |
+          mkdir -p target
+          set -o pipefail
+          npm run desktop:build:linux 2>&1 | tee target/linux-desktop-build.log
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -72,6 +78,14 @@ jobs:
             target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Upload Linux build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-linux-build-log
+          path: target/linux-desktop-build.log
+          if-no-files-found: ignore
 
       - name: Attach bundles to tagged release
         if: startsWith(github.ref, 'refs/tags/v')

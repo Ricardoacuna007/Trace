@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
-    "desktop:build:linux": "tauri build --bundles deb,appimage",
+    "desktop:build:linux": "tauri build --ci --verbose --bundles deb appimage",
     "server:prepare-web": "node scripts/prepare-server-web.mjs",
     "server:dev": "npm run build && npm run server:prepare-web && cargo run -p trace-server --",
     "server:build": "npm run build && npm run server:prepare-web && cargo build --release -p trace-server",
