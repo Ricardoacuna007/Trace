@@ -15,7 +15,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && npm run server:prepare-web && node scripts/e2e-server.mjs',
     url: 'http://127.0.0.1:18080/health',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })

@@ -44,7 +44,7 @@ Se dispara en:
 - `push` a `main`
 - `pull_request` contra `main`
 - ejecución manual desde `Actions > Build Linux Desktop > Run workflow`
-- tags `v*`, por ejemplo `v0.1.0`
+- tags `v*`, por ejemplo `v0.2.0`
 
 Cuando el workflow corre sobre un tag `v*`, adjunta los bundles a un GitHub Release en modo draft.
 

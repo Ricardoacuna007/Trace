@@ -2,6 +2,42 @@
 
 Todos los cambios notables de Trace se registran aqui.
 
+## 0.2.0 - 2026-06-06
+
+Release de self-host y calidad para dejar Trace listo para probar como app
+local-first + servidor all-in-one.
+
+### Agregado
+
+- UI web self-host unificada con el `AppShell` principal.
+- Deteccion centralizada de entorno web/Tauri con `EnvProvider`.
+- Refresh tokens en SQLite con cookie `HttpOnly` y access token en memoria.
+- Logout real, restauracion silenciosa de sesion y revocacion global de
+  sesiones.
+- Audit log protegido para setup, login, logout, backup y restore.
+- Proteccion anti zip-bomb en restore.
+- Historial de backups y preview antes de restaurar.
+- Sync explicito desktop-servidor con push, pull, estado y conflictos.
+- Seccion de sincronizacion en Settings desktop.
+- Settings web self-host con cuenta, servidor, seguridad, datos y danger zone.
+- Guia de instalacion para Desktop, Docker y binario Linux.
+- Tests E2E Playwright para setup/login, notas, backup/restore y sync.
+- Tests de integracion HTTP de `trace-server`.
+- Workflows de Windows, Linux, Docker, E2E y seguridad.
+- Ajustes responsive del shell en 768px y 1024px.
+
+### Cambiado
+
+- La UI web ya no depende de `src/web/TraceWebApp.tsx`.
+- El flujo de restore exige confirmacion explicita escribiendo `RESTORE`.
+- La revision de seguridad documenta los riesgos residuales de v0.2.
+
+### Pendiente conocido
+
+- Publicar el release solo despues de revisar los artefactos generados por CI.
+- Firma de instaladores Windows/macOS.
+- Multiusuario con roles y cifrado de vault quedan para crecimiento futuro.
+
 ## 0.1.0 - 2026-06-05
 
 Version inicial de desarrollo publico.
@@ -26,8 +62,4 @@ Version inicial de desarrollo publico.
 
 ### Pendiente conocido
 
-- Rate limiting para setup/login.
-- Refresh tokens y revocacion de sesiones.
-- UI web self-host con la misma profundidad visual que el desktop.
-- Push/pull desktop-servidor.
 - Release publico firmado y probado manualmente en Linux, Windows y macOS.

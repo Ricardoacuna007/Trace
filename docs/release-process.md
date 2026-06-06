@@ -14,14 +14,15 @@ npm run check
 
 - `Build Linux Desktop`
 - `Build Docker Image`
+- `Security Audit`
 
 3. Actualizar `CHANGELOG.md`.
 
 ## Crear version
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 El workflow `Build Linux Desktop` crea un release draft y adjunta:
@@ -32,7 +33,7 @@ El workflow `Build Linux Desktop` crea un release draft y adjunta:
 El workflow `Publish Docker Image` publica:
 
 - `ghcr.io/ricardoacuna007/trace-server:latest`
-- `ghcr.io/ricardoacuna007/trace-server:v0.1.0`
+- `ghcr.io/ricardoacuna007/trace-server:v0.2.0`
 
 ## Publicar
 
@@ -43,6 +44,6 @@ El workflow `Publish Docker Image` publica:
 
 ## Pendiente de release automation
 
-- Adjuntar Windows MSI/NSIS.
 - Adjuntar binario `trace-server` Linux.
+- Adjuntar Windows MSI/NSIS al release draft.
 - Firmar artefactos.
