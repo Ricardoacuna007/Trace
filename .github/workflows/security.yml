@@ -34,7 +34,10 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run cargo audit
-        run: cargo audit
+        # RUSTSEC-2023-0071 is pulled into Cargo.lock by sqlx's optional MySQL
+        # support through tauri-plugin-sql. Trace enables only SQLite, so the
+        # vulnerable RSA code is not in the active dependency graph.
+        run: cargo audit --ignore RUSTSEC-2023-0071
 
   npm-audit:
     name: npm audit
@@ -63,6 +66,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
