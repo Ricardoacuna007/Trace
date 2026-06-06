@@ -2,6 +2,22 @@
 
 Todos los cambios notables de Trace se registran aqui.
 
+## 0.2.1 - 2026-06-06
+
+Patch de empaquetado y automatizacion de release.
+
+### Agregado
+
+- El release draft ahora recibe los instaladores Windows `.msi` y `-setup.exe`.
+- El release draft ahora recibe `trace-server-linux-x86_64.tar.gz` y su
+  checksum SHA-256.
+- El workflow Windows se puede ejecutar manualmente desde GitHub Actions.
+
+### Cambiado
+
+- La guia de instalacion Linux explica como extraer y verificar el paquete
+  `trace-server-linux-x86_64`.
+
 ## 0.2.0 - 2026-06-06
 
 Release de self-host y calidad para dejar Trace listo para probar como app

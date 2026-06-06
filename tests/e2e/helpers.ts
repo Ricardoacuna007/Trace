@@ -32,6 +32,19 @@ export function newNoteButton(page: Page) {
   return page.getByRole('complementary').getByRole('button', { name: 'Nueva nota' })
 }
 
+export async function openAppWithApiSession(page: Page): Promise<void> {
+  const token = await apiAccessToken(page.request)
+  await page.route('**/api/auth/refresh', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ token, user_id: 'e2e-admin' }),
+    })
+  })
+  await page.goto('/')
+  await expect(newNoteButton(page)).toBeVisible({ timeout: 20_000 })
+}
+
 interface SetupStatusResponse {
   setup_required?: unknown
 }

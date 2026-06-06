@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { ensureSignedIn, newNoteButton } from './helpers'
+import { newNoteButton, openAppWithApiSession } from './helpers'
 
 test('creates and edits a note in the web UI', async ({ page }) => {
-  await ensureSignedIn(page)
+  await openAppWithApiSession(page)
 
   const title = `E2E Note ${Date.now()}`
   await newNoteButton(page).click()

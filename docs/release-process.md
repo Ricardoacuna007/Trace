@@ -21,8 +21,8 @@ npm run check
 ## Crear version
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 El workflow `Build Linux Desktop` crea un release draft y adjunta:
@@ -40,7 +40,7 @@ El workflow `Build Windows Desktop` adjunta al mismo release draft:
 El workflow `Publish Docker Image` publica:
 
 - `ghcr.io/ricardoacuna007/trace-server:latest`
-- `ghcr.io/ricardoacuna007/trace-server:v0.2.0`
+- `ghcr.io/ricardoacuna007/trace-server:v0.2.1`
 
 ## Publicar
 
