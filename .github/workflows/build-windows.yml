@@ -1,12 +1,13 @@
 name: Build Windows Desktop
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -48,6 +49,16 @@ jobs:
           name: trace-windows-x86_64
           if-no-files-found: error
           path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+
+      - name: Attach Windows bundles to tagged release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
             target/release/bundle/msi/*.msi
             target/release/bundle/nsis/*-setup.exe
             src-tauri/target/release/bundle/msi/*.msi

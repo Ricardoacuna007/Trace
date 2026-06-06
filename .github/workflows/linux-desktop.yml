@@ -68,6 +68,20 @@ jobs:
           set -o pipefail
           npm run desktop:build:linux 2>&1 | tee target/linux-desktop-build.log
 
+      - name: Build trace-server binary
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm run server:build
+
+      - name: Package trace-server binary
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p target/trace-server-linux-x86_64
+          cp target/release/trace-server target/trace-server-linux-x86_64/trace-server
+          cp README.md target/trace-server-linux-x86_64/README.md
+          cp docs/getting-started.md target/trace-server-linux-x86_64/getting-started.md
+          tar -C target -czf target/trace-server-linux-x86_64.tar.gz trace-server-linux-x86_64
+          sha256sum target/trace-server-linux-x86_64.tar.gz > target/trace-server-linux-x86_64.tar.gz.sha256
+
       - name: Report Linux build failure
         if: failure()
         run: |
@@ -89,6 +103,16 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
 
+      - name: Upload trace-server Linux binary
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-server-linux-x86_64
+          if-no-files-found: error
+          path: |
+            target/trace-server-linux-x86_64.tar.gz
+            target/trace-server-linux-x86_64.tar.gz.sha256
+
       - name: Upload Linux build log
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,3 +131,5 @@ jobs:
             target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
+            target/trace-server-linux-x86_64.tar.gz
+            target/trace-server-linux-x86_64.tar.gz.sha256

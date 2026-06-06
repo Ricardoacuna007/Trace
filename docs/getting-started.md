@@ -53,21 +53,35 @@ Despues del primer setup, la pantalla de setup deja de estar disponible.
 
 Esta ruta es util si quieres ejecutar Trace en Linux sin Docker.
 
-1. Descarga el binario `trace-server` desde releases.
-2. Crea una carpeta para los datos:
+1. Descarga `trace-server-linux-x86_64.tar.gz` y
+   `trace-server-linux-x86_64.tar.gz.sha256` desde releases.
+2. Verifica el archivo descargado:
+
+```bash
+sha256sum -c trace-server-linux-x86_64.tar.gz.sha256
+```
+
+3. Extrae el paquete:
+
+```bash
+tar -xzf trace-server-linux-x86_64.tar.gz
+cd trace-server-linux-x86_64
+```
+
+4. Crea una carpeta para los datos:
 
 ```bash
 mkdir -p ~/trace-data
 ```
 
-3. Ejecuta el servidor:
+5. Ejecuta el servidor:
 
 ```bash
 TRACE_DATA_DIR=~/trace-data TRACE_BIND=0.0.0.0:8080 ./trace-server
 ```
 
-4. Abre `http://localhost:8080`.
-5. Crea el primer usuario administrador.
+6. Abre `http://localhost:8080`.
+7. Crea el primer usuario administrador.
 
 Para dejarlo corriendo siempre, puedes usar el administrador de servicios de tu sistema o Docker.
 

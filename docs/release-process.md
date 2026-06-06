@@ -29,6 +29,13 @@ El workflow `Build Linux Desktop` crea un release draft y adjunta:
 
 - `.deb`
 - `.AppImage`
+- `trace-server-linux-x86_64.tar.gz`
+- `trace-server-linux-x86_64.tar.gz.sha256`
+
+El workflow `Build Windows Desktop` adjunta al mismo release draft:
+
+- `.msi`
+- `-setup.exe`
 
 El workflow `Publish Docker Image` publica:
 
@@ -44,6 +51,4 @@ El workflow `Publish Docker Image` publica:
 
 ## Pendiente de release automation
 
-- Adjuntar binario `trace-server` Linux.
-- Adjuntar Windows MSI/NSIS al release draft.
 - Firmar artefactos.
