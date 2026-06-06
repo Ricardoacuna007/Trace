@@ -80,6 +80,7 @@ interface AppShellProps {
   onSetEditorWidth: (width: 'full' | 'centered') => void
   onTitleChange: (noteId: string, title: string) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
+  onTogglePropertiesPanel: () => void
   onUnpinNote: (noteId: string) => void
   onUpdateMarkdownProperty: (filePath: string, key: string, value: unknown) => void
 }
@@ -168,6 +169,7 @@ export function AppShell({
   onSetEditorWidth,
   onTitleChange,
   onToggleModule,
+  onTogglePropertiesPanel,
   onUnpinNote,
   onUpdateMarkdownProperty,
 }: AppShellProps) {
@@ -253,7 +255,18 @@ export function AppShell({
             />
           ) : (
             <>
-              {uiModules.show_breadcrumbs ? <NoteHeader breadcrumbs={breadcrumbs} /> : null}
+              {uiModules.show_breadcrumbs ? (
+                <NoteHeader
+                  breadcrumbs={breadcrumbs}
+                  note={selectedNote}
+                  propertiesPanelOpen={isPropertiesPanelOpen}
+                  onExportMarkdown={onExportCurrentNoteMarkdown}
+                  onOpenCommandPalette={onOpenCommandPalette}
+                  onOpenConnectModal={onOpenConnectModal}
+                  onPrintCurrentNote={onPrintCurrentNote}
+                  onTogglePropertiesPanel={onTogglePropertiesPanel}
+                />
+              ) : null}
               <NoteMetaBar
                 note={selectedNote}
                 isPinned={pinned}

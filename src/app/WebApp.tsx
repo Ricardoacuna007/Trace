@@ -97,6 +97,7 @@ export function WebApp() {
   const [pinnedNoteIds, setPinnedNoteIds] = useState<string[]>([])
   const [commandOpen, setCommandOpen] = useState(false)
   const [commandQuery, setCommandQuery] = useState('')
+  const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -482,7 +483,7 @@ export function WebApp() {
         isBacklinksPanelOpen
         ioMessage={message}
         ioWorking={busy}
-        isPropertiesPanelOpen
+        isPropertiesPanelOpen={propertiesPanelOpen}
         isSidebarOpen
         markdownDbLoading={false}
         markdownDbSnapshot={null}
@@ -521,6 +522,7 @@ export function WebApp() {
         onSetEditorWidth={() => setMessage('El ancho del editor web se configurara en settings self-host.')}
         onTitleChange={handleTitleChange}
         onToggleModule={() => setMessage('Los modulos UI web se configuraran en settings self-host.')}
+        onTogglePropertiesPanel={() => setPropertiesPanelOpen((open) => !open)}
         onUnpinNote={unpinNote}
         onPrintCurrentNote={() => window.print()}
         onUpdateMarkdownProperty={() => setMessage('La base Markdown local solo esta disponible en desktop.')}

@@ -101,6 +101,7 @@ function DesktopApp() {
     saveNoteNow,
     hasPendingChanges,
     toggleSidebar,
+    togglePropertiesPanel,
     updateUIModule,
     setEditorWidth,
     unpinNote,
@@ -385,6 +386,7 @@ function DesktopApp() {
         onSetEditorWidth={(width) => void setEditorWidth(width)}
         onTitleChange={queueNoteTitleSave}
         onToggleModule={(module, enabled) => void updateUIModule(module, enabled)}
+        onTogglePropertiesPanel={togglePropertiesPanel}
         onUnpinNote={unpinNote}
         onPrintCurrentNote={handlePrintCurrentNote}
         onUpdateMarkdownProperty={(filePath, key, value) => void updateMarkdownDatabaseProperty(filePath, key, value)}
