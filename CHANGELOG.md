@@ -2,6 +2,18 @@
 
 Todos los cambios notables de Trace se registran aqui.
 
+## 0.2.3 - 2026-06-06
+
+Patch de interacciones del editor.
+
+### Agregado
+
+- El boton de compartir de la nota copia una referencia interna `[[titulo]]`
+  al portapapeles y muestra confirmacion visual.
+- El boton de tres puntos abre un menu con acciones reales: copiar referencia,
+  conectar nota, exportar Markdown, imprimir/PDF, alternar propiedades y abrir
+  comandos.
+
 ## 0.2.2 - 2026-06-06
 
 Patch del editor rich text en Windows.

@@ -1,6 +1,6 @@
 [package]
 name = "trace"
-version = "0.2.2"
+version = "0.2.3"
 description = "Trace desktop notes app"
 authors = ["Trace"]
 license = ""
