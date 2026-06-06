@@ -2,6 +2,16 @@
 
 Todos los cambios notables de Trace se registran aqui.
 
+## 0.2.2 - 2026-06-06
+
+Patch del editor rich text en Windows.
+
+### Corregido
+
+- BlockNote, Tiptap y ProseMirror ahora se empaquetan en un solo chunk de
+  produccion para evitar fallos de importacion circular en WebView2 que
+  activaban el modo seguro de texto plano.
+
 ## 0.2.1 - 2026-06-06
 
 Patch de empaquetado y automatizacion de release.
