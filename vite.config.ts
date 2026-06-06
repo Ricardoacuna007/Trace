@@ -18,7 +18,9 @@ export default defineConfig({
             {
               name: 'blocknote-vendor',
               test: /node_modules[\\/](@blocknote|@tiptap|prosemirror|yjs|lib0)[\\/]/,
-              maxSize: 260_000,
+              // Keep the rich editor dependency graph together. WebView2 can
+              // fail on ProseMirror/Tiptap circular imports when this group is
+              // split into many maxSize chunks in production.
               priority: 35,
             },
             {
