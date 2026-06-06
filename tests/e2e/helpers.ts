@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 export const adminEmail = 'admin@example.com'
 export const adminPassword = 'password123'
@@ -20,7 +20,9 @@ export async function ensureSignedIn(page: Page): Promise<void> {
   if (await loginHeading.isVisible().catch(() => false)) {
     await page.getByLabel('Email').fill(adminEmail)
     await page.getByLabel('Contrasena').fill(adminPassword)
+    const loginResponse = page.waitForResponse((response) => response.url().endsWith('/api/auth/login'))
     await page.getByRole('button', { name: 'Entrar' }).click()
+    expect((await loginResponse).ok()).toBe(true)
   }
 
   await expect(newNoteButton(page)).toBeVisible()
@@ -30,19 +32,37 @@ export function newNoteButton(page: Page) {
   return page.getByRole('complementary').getByRole('button', { name: 'Nueva nota' })
 }
 
-export async function accessToken(page: Page): Promise<string> {
-  return page.evaluate(async () => {
-    const response = await fetch('/api/auth/refresh', {
-      method: 'POST',
-      credentials: 'include',
+interface SetupStatusResponse {
+  setup_required?: unknown
+}
+
+interface AuthResponse {
+  token?: unknown
+}
+
+export async function apiAccessToken(request: APIRequestContext): Promise<string> {
+  const setupStatus = await request.get('/api/setup/status')
+  expect(setupStatus.ok()).toBe(true)
+  const statusBody = await setupStatus.json() as SetupStatusResponse
+  const authResponse = statusBody.setup_required === true
+    ? await request.post('/setup', {
+      data: {
+        workspace_name: 'Trace E2E',
+        email: adminEmail,
+        password: adminPassword,
+      },
     })
-    if (!response.ok) {
-      throw new Error('No se pudo refrescar token E2E')
-    }
-    const body = await response.json() as { token?: unknown }
-    if (typeof body.token !== 'string') {
-      throw new Error('Refresh E2E no devolvio token')
-    }
-    return body.token
-  })
+    : await request.post('/api/auth/login', {
+      data: {
+        email: adminEmail,
+        password: adminPassword,
+      },
+    })
+
+  expect(authResponse.ok()).toBe(true)
+  const authBody = await authResponse.json() as AuthResponse
+  if (typeof authBody.token !== 'string') {
+    throw new Error('Auth API E2E no devolvio token')
+  }
+  return authBody.token
 }
