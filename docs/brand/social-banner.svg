@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <!-- Fondo -->
+  <rect width="1280" height="640" fill="#0d0f12"/>
+
+  <!-- Grid sutil de fondo — líneas muy tenues -->
+  <defs>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.04"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+
+  <!-- Glow suave detrás del logo — círculo difuso -->
+  <ellipse cx="440" cy="320" rx="300" ry="260" fill="#5e8bff" opacity="0.04"/>
+
+  <!-- ─── LOGO GRANDE centrado-izquierdo ─── -->
+  <!-- Ícono — 160x160 -->
+  <g transform="translate(240, 200)">
+    <!-- barra horizontal -->
+    <line x1="0"   y1="0"   x2="160" y2="0"   stroke="#5e8bff" stroke-width="10" stroke-linecap="round"/>
+    <!-- trazo vertical + diagonal -->
+    <polyline points="80,0 80,80 130,160" fill="none" stroke="#5e8bff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- anillo exterior -->
+    <circle cx="130" cy="160" r="22" fill="none" stroke="#5e8bff" stroke-width="5.5"/>
+    <!-- punto interior -->
+    <circle cx="130" cy="160" r="9" fill="#5e8bff"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text
+    x="440"
+    y="360"
+    font-family="'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="96"
+    font-weight="300"
+    letter-spacing="-2"
+    fill="#e8eaf0"
+  >Trace</text>
+
+  <!-- Tagline -->
+  <text
+    x="440"
+    y="412"
+    font-family="'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="22"
+    font-weight="300"
+    letter-spacing="0"
+    fill="#555b6b"
+  >local-first notes · self-hosted · open source</text>
+
+  <!-- ─── Decoración derecha — mini grafo de nodos ─── -->
+  <g transform="translate(820, 200)" opacity="0.18">
+    <!-- aristas -->
+    <line x1="200" y1="120" x2="80"  y2="40"  stroke="#5e8bff" stroke-width="1.5"/>
+    <line x1="200" y1="120" x2="320" y2="40"  stroke="#5e8bff" stroke-width="1.5"/>
+    <line x1="200" y1="120" x2="340" y2="180" stroke="#5e8bff" stroke-width="1.5"/>
+    <line x1="200" y1="120" x2="80"  y2="200" stroke="#5e8bff" stroke-width="1.5"/>
+    <line x1="200" y1="120" x2="200" y2="260" stroke="#5e8bff" stroke-width="1.5"/>
+    <line x1="80"  y1="40"  x2="320" y2="40"  stroke="#5e8bff" stroke-width="0.8"/>
+    <line x1="80"  y1="200" x2="200" y2="260" stroke="#5e8bff" stroke-width="0.8"/>
+    <!-- nodos satélite -->
+    <circle cx="80"  cy="40"  r="12" fill="none" stroke="#5e8bff" stroke-width="1.5"/>
+    <circle cx="320" cy="40"  r="12" fill="none" stroke="#5e8bff" stroke-width="1.5"/>
+    <circle cx="340" cy="180" r="10" fill="none" stroke="#5e8bff" stroke-width="1.5"/>
+    <circle cx="80"  cy="200" r="10" fill="none" stroke="#5e8bff" stroke-width="1.5"/>
+    <circle cx="200" cy="260" r="8"  fill="none" stroke="#5e8bff" stroke-width="1.5"/>
+    <!-- nodo central -->
+    <circle cx="200" cy="120" r="28" fill="#5e8bff" opacity="0.25"/>
+    <circle cx="200" cy="120" r="20" fill="none" stroke="#5e8bff" stroke-width="2"/>
+    <circle cx="200" cy="120" r="8"  fill="#5e8bff"/>
+  </g>
+
+  <!-- Badge version -->
+  <rect x="440" y="440" width="88" height="26" rx="5" fill="#1a1e25"/>
+  <text
+    x="484"
+    y="458"
+    font-family="'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace"
+    font-size="12"
+    font-weight="400"
+    fill="#5e8bff"
+    text-anchor="middle"
+  >v0.2.3</text>
+</svg>

@@ -1,5 +1,11 @@
 # Trace
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/brand/logo-light.svg">
+  <img src="docs/brand/logo-light.svg" alt="Trace" height="56">
+</picture>
+
 Trace es una app de escritorio local-first para notas y conocimiento personal.
 Corre sobre Tauri 2 (Rust + WebView) con frontend React.
 
