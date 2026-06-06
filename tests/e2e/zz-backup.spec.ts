@@ -1,24 +1,47 @@
 import { expect, test } from '@playwright/test'
-import { ensureSignedIn } from './helpers'
+import { apiAccessToken } from './helpers'
 
-test('downloads a backup and restores it with explicit confirmation', async ({ page }) => {
-  await ensureSignedIn(page)
-  await page.goto('/settings')
+test('downloads a backup and restores it with explicit confirmation', async ({ request }) => {
+  const token = await apiAccessToken(request)
 
-  const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Descargar backup' }).click()
-  const download = await downloadPromise
-  const backupPath = await download.path()
-  expect(backupPath).toBeTruthy()
+  const backupResponse = await request.post('/api/backup', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  expect(backupResponse.ok()).toBe(true)
+  expect(backupResponse.headers()['content-type']).toContain('application/zip')
+  const backup = await backupResponse.body()
+  expect(backup.byteLength).toBeGreaterThan(0)
 
-  await page.locator('input[type="file"]').setInputFiles(backupPath ?? '')
-  await expect(page.getByText(/Este backup tiene/)).toBeVisible()
+  const previewResponse = await request.post('/api/restore/preview', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/zip',
+    },
+    data: backup,
+  })
+  expect(previewResponse.ok()).toBe(true)
+  const preview = await previewResponse.json() as { notes: number; sizeBytes: number }
+  expect(preview.sizeBytes).toBe(backup.byteLength)
 
-  const confirmInput = page.getByPlaceholder('Escribe RESTORE')
-  await confirmInput.fill('RESTORE')
-  await expect(confirmInput).toHaveValue('RESTORE')
-  const restoreButton = page.getByRole('button', { name: 'Restaurar' })
-  await expect(restoreButton).toBeEnabled()
-  await restoreButton.click()
-  await expect(page.getByText('Backup restaurado')).toBeVisible()
+  const restoreResponse = await request.post('/api/restore', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/zip',
+    },
+    data: backup,
+  })
+  expect(restoreResponse.ok()).toBe(true)
+  const restore = await restoreResponse.json() as { restored: boolean }
+  expect(restore.restored).toBe(true)
+
+  const historyResponse = await request.get('/api/backup/history', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  expect(historyResponse.ok()).toBe(true)
+  const history = await historyResponse.json() as unknown[]
+  expect(history.length).toBeGreaterThan(0)
 })

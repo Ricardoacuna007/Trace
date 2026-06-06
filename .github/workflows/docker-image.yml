@@ -109,6 +109,11 @@ jobs:
       - name: Run E2E tests
         run: npm run e2e
 
+      - name: Print Playwright error contexts
+        if: failure()
+        run: |
+          find test-results -name error-context.md -print -exec cat {} \; || true
+
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

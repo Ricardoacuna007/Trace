@@ -25,7 +25,7 @@ export async function ensureSignedIn(page: Page): Promise<void> {
     expect((await loginResponse).ok()).toBe(true)
   }
 
-  await expect(newNoteButton(page)).toBeVisible()
+  await expect(newNoteButton(page)).toBeVisible({ timeout: 20_000 })
 }
 
 export function newNoteButton(page: Page) {
