@@ -75,8 +75,8 @@ npm run tauri build
 Artefactos de salida (Windows):
 
 - `src-tauri/target/release/trace.exe`
-- `src-tauri/target/release/bundle/msi/Trace_0.2.3_x64_en-US.msi`
-- `src-tauri/target/release/bundle/nsis/Trace_0.2.3_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/Trace_0.2.4_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/Trace_0.2.4_x64-setup.exe`
 
 ## Self-host all-in-one
 

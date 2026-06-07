@@ -2,6 +2,23 @@
 
 Todos los cambios notables de Trace se registran aqui.
 
+## 0.2.4 - 2026-06-06
+
+Patch de feedback de testers.
+
+### Agregado
+
+- Roadmap de Trace v0.3 y feedback log para registrar bugs, mejoras y
+  decisiones de producto.
+- Templates de GitHub Issues para bugs y mejoras.
+
+### Corregido
+
+- Los titulos largos de notas ahora se muestran correctamente en el editor
+  principal con wrap visual de hasta 3 lineas.
+- Las superficies compactas conservan ellipsis pero muestran el titulo
+  completo en tooltip.
+
 ## 0.2.3 - 2026-06-06
 
 Patch de interacciones del editor.

@@ -5256,7 +5256,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "trace"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "deunicode",
  "log",
@@ -5274,7 +5274,7 @@ dependencies = [
 
 [[package]]
 name = "trace-core"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -5285,7 +5285,7 @@ dependencies = [
 
 [[package]]
 name = "trace-server"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "argon2",
