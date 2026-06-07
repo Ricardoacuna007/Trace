@@ -71,6 +71,7 @@ export function useAppStoreSelection() {
       commitDraftToDB: state.commitDraftToDB,
       addDraftRelation: state.addDraftRelation,
       removeDraftRelation: state.removeDraftRelation,
+      connectNotes: state.connectNotes,
       openConnectModal: state.openConnectModal,
       pinNote: state.pinNote,
       setActiveView: state.setActiveView,

@@ -98,6 +98,7 @@ function DesktopApp() {
     beginNoteDraft,
     discardDraft,
     commitDraftToDB,
+    connectNotes,
     openConnectModal,
     pinNote,
     queueNoteTitleSave,
@@ -400,6 +401,7 @@ function DesktopApp() {
         uiModules={uiModules}
         viewMode={viewMode}
         onContentChange={handleContentChange}
+        onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
         onCreateFolder={() => void createFolder()}
         onCreateNote={handleCreateNoteShortcut}
         onExportCurrentNoteMarkdown={() => void handleExportCurrentNote()}

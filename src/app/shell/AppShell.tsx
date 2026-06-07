@@ -64,6 +64,7 @@ interface AppShellProps {
   viewMode: ViewMode
   renderConnectModal?: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
+  onConnectNotes: (sourceId: string, targetIds: string[]) => void
   onCreateFolder: () => void
   onCreateNote: () => void
   onExportCurrentNoteMarkdown: () => void
@@ -163,6 +164,7 @@ export function AppShell({
   viewMode,
   renderConnectModal = true,
   onContentChange,
+  onConnectNotes,
   onCreateFolder,
   onCreateNote,
   onExportCurrentNoteMarkdown,
@@ -322,6 +324,7 @@ export function AppShell({
                 showProperties={isPropertiesPanelOpen}
                 showWordCount={traceLayout.visible_elements.word_count}
                 onContentChange={onContentChange}
+                onConnectNotes={onConnectNotes}
                 onOpenWikiLink={onOpenWikiLink}
                 onSelectNode={onOpenNode}
                 onTitleChange={onTitleChange}

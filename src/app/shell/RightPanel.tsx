@@ -1,9 +1,6 @@
-﻿import { FileText, Network, Sigma } from 'lucide-react'
-import type { ReactNode } from 'react'
-import type { NoteBacklink } from '../../lib/db'
-import type { NoteRelation } from '../../store/types'
-import type { Note } from '../../types/note'
-import type { AppNode } from '../../types/workspace'
+import { Check, FileText, Network, Sigma, Sparkles, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { pairKey, suggestConnections, type ConnectionSuggestion } from '../../features/notes-connections/suggestions'
 import {
   buildBacklinkItems,
   countWords,
@@ -11,6 +8,10 @@ import {
   formatDate,
   type BacklinkViewItem,
 } from '../../features/notes-editor/contentMetrics'
+import type { NoteBacklink } from '../../lib/db'
+import type { NoteRelation } from '../../store/types'
+import type { Note } from '../../types/note'
+import type { AppNode } from '../../types/workspace'
 
 interface RightPanelProps {
   backlinks: NoteBacklink[]
@@ -20,6 +21,7 @@ interface RightPanelProps {
   recentConnectionIds: string[]
   showBacklinks: boolean
   showProperties: boolean
+  onConnectNotes: (sourceId: string, targetIds: string[]) => void
   onSelectNode: (id: string) => void
 }
 
@@ -35,6 +37,27 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
 function isBidirectional(noteId: string, sourceId: string, relations: NoteRelation[]): boolean {
   return relations.some((relation) => relation.sourceId === sourceId && relation.targetId === noteId)
     && relations.some((relation) => relation.sourceId === noteId && relation.targetId === sourceId)
+}
+
+function ignoredStorageKey(noteId: string): string {
+  return `trace:ignored-suggestions:${noteId}`
+}
+
+function readIgnoredPairs(noteId: string): Set<string> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ignoredStorageKey(noteId)) ?? '[]')
+    return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function writeIgnoredPairs(noteId: string, pairs: Set<string>) {
+  window.localStorage.setItem(ignoredStorageKey(noteId), JSON.stringify([...pairs]))
+}
+
+function nodeKey(nodes: AppNode[]): string {
+  return nodes.map((node) => `${node.id}:${node.updatedAt}`).join('|')
 }
 
 function BacklinkRow({
@@ -74,6 +97,53 @@ function BacklinkRow({
         </div>
       </div>
     </button>
+  )
+}
+
+function SuggestionCard({
+  suggestion,
+  onAccept,
+  onIgnore,
+  onOpen,
+}: {
+  suggestion: ConnectionSuggestion
+  onAccept: (targetId: string) => void
+  onIgnore: (targetId: string) => void
+  onOpen: (targetId: string) => void
+}) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2">
+      <div className="mb-1.5 flex items-start gap-2">
+        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+        <button type="button" onClick={() => onOpen(suggestion.note.id)} className="min-w-0 flex-1 text-left">
+          <p className="truncate text-[12px] font-medium text-[var(--t1)]" title={suggestion.note.title}>
+            {suggestion.note.title}
+          </p>
+          <p className="line-clamp-2 text-[11px] leading-snug text-[var(--t2)]">"{suggestion.fragment}"</p>
+        </button>
+      </div>
+      <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg4)]">
+        <span className="block h-full rounded-full bg-[var(--accent)]" style={{ width: `${suggestion.scorePercent}%` }} />
+      </div>
+      <div className="flex items-center justify-end gap-1.5">
+        <button
+          type="button"
+          aria-label={`Ignorar sugerencia ${suggestion.note.title}`}
+          className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] text-[var(--t3)] transition-colors hover:bg-[var(--bg3)] hover:text-[var(--red)]"
+          onClick={() => onIgnore(suggestion.note.id)}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          aria-label={`Conectar con ${suggestion.note.title}`}
+          className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] border border-[rgba(74,222,128,0.28)] bg-[rgba(74,222,128,0.08)] text-[var(--green)] transition-colors hover:bg-[rgba(74,222,128,0.16)]"
+          onClick={() => onAccept(suggestion.note.id)}
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -143,12 +213,28 @@ export function RightPanel({
   recentConnectionIds,
   showBacklinks,
   showProperties,
+  onConnectNotes,
   onSelectNode,
 }: RightPanelProps) {
   const headings = extractHeadings(note.content)
   const backlinkItems = buildBacklinkItems(note.id, nodes, noteRelations, backlinks)
   const words = countWords(note.content)
   const outgoing = noteRelations.filter((relation) => relation.sourceId === note.id).length
+  const [ignoredPairs, setIgnoredPairs] = useState(() => readIgnoredPairs(note.id))
+  const suggestions = useMemo(() => (
+    suggestConnections(note, nodes, noteRelations, ignoredPairs)
+  ), [ignoredPairs, nodeKey(nodes), note, noteRelations])
+
+  useEffect(() => {
+    setIgnoredPairs(readIgnoredPairs(note.id))
+  }, [note.id])
+
+  const ignoreSuggestion = (targetId: string) => {
+    const next = new Set(ignoredPairs)
+    next.add(pairKey(note.id, targetId))
+    setIgnoredPairs(next)
+    writeIgnoredPairs(note.id, next)
+  }
 
   return (
     <aside className="trace-scrollbar hidden h-full w-[var(--right-panel-w)] shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg2)] xl:block">
@@ -196,6 +282,24 @@ export function RightPanel({
           )}
         </Section>
       ) : null}
+
+      <Section title="Posibles conexiones">
+        {suggestions.length === 0 ? (
+          <p className="text-[11px] text-[var(--t3)]">Sin sugerencias nuevas.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {suggestions.map((suggestion) => (
+              <SuggestionCard
+                key={suggestion.note.id}
+                suggestion={suggestion}
+                onAccept={(targetId) => onConnectNotes(note.id, [targetId])}
+                onIgnore={ignoreSuggestion}
+                onOpen={onSelectNode}
+              />
+            ))}
+          </div>
+        )}
+      </Section>
 
       {showProperties ? (
         <Section title="Propiedades">
