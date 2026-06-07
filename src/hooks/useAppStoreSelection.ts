@@ -55,6 +55,7 @@ export function useAppStoreSelection() {
       createWorkspace: state.createWorkspace,
       createFolder: state.createFolder,
       createNewNote: state.createNewNote,
+      createInboxNote: state.createInboxNote,
       createNoteFromTitle: state.createNoteFromTitle,
       deleteNodeById: state.deleteNodeById,
       renameNodeById: state.renameNodeById,

@@ -1,9 +1,11 @@
-﻿import { Clock, Plus, Search, Star, Tag } from 'lucide-react'
+import { Clock, Inbox, Plus, Search, Star, Tag } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import type { Note } from '../../types/note'
 import type { TreeNode as WorkspaceTreeNode } from '../../types/workspace'
 import { TreeNode } from './TreeNode'
 
 interface SidebarProps {
+  inboxNotes: Note[]
   nodeTree: WorkspaceTreeNode[]
   selectedNodeId: string | null
   pinnedNoteIds: string[]
@@ -48,6 +50,7 @@ function NavItem({ active = false, badge, icon: Icon, label, onClick }: NavItemP
 }
 
 export function Sidebar({
+  inboxNotes,
   nodeTree,
   selectedNodeId,
   pinnedNoteIds,
@@ -88,6 +91,9 @@ export function Sidebar({
     })
   }
 
+  const firstInboxNote = inboxNotes[0]
+  const inboxActive = inboxNotes.some((note) => note.id === selectedNodeId)
+
   return (
     <aside className="trace-scrollbar hidden h-full w-[var(--sidebar-w)] shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--bg2)] lg:flex">
       <div className="border-b border-[var(--border)] p-2.5">
@@ -105,12 +111,51 @@ export function Sidebar({
       </div>
 
       <div className="space-y-1 border-b border-[var(--border)] p-2">
+        <NavItem
+          active={inboxActive}
+          badge={inboxNotes.length}
+          icon={Inbox}
+          label="Bandeja de entrada"
+          onClick={() => {
+            if (firstInboxNote) {
+              onSelectNode(firstInboxNote.id)
+              return
+            }
+            onSetWorkspaceView()
+          }}
+        />
         <NavItem icon={Clock} label="Recientes" onClick={onSetWorkspaceView} />
         <NavItem icon={Star} label="Favoritos" badge={pinnedNoteIds.length} onClick={onSetWorkspaceView} />
         <NavItem icon={Tag} label="Etiquetas" badge={tagCount} onClick={onSetWorkspaceView} />
       </div>
 
       <div className="trace-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
+        {inboxNotes.length > 0 ? (
+          <div className="mb-3">
+            <div className="mb-1 px-1.5 font-mono text-[10px] uppercase tracking-wide text-[var(--t3)]">
+              Bandeja
+            </div>
+            <div className="space-y-1">
+              {inboxNotes.slice(0, 6).map((note) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  title={note.title}
+                  onClick={() => onSelectNode(note.id)}
+                  className={`flex h-7 w-full min-w-0 items-center gap-1.5 rounded-[var(--radius-sm)] px-1.5 text-left text-[12px] transition-all duration-150 ${
+                    selectedNodeId === note.id
+                      ? 'bg-[var(--accent-glow)] text-[var(--accent)]'
+                      : 'text-[var(--t2)] hover:bg-[var(--bg3)] hover:text-[var(--t1)]'
+                  }`}
+                >
+                  <Inbox className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                  <span className="truncate">{note.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="mb-1 px-1.5 font-mono text-[10px] uppercase tracking-wide text-[var(--t3)]">
           Árbol
         </div>

@@ -180,6 +180,9 @@ export function AppShell({
   const workspaceTitle = nodes.find((node) => node.type === 'workspace')?.title
     ?? activeVaultPath?.split(/[\\/]/).filter(Boolean).at(-1)
     ?? 'Workspace'
+  const inboxNotes = nodes
+    .filter((node): node is Note => node.type === 'note' && typeof node.content === 'string' && node.inbox)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
   return (
     <div className="app-shell flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--t1)]">
@@ -187,6 +190,7 @@ export function AppShell({
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {isSidebarOpen ? (
           <Sidebar
+            inboxNotes={inboxNotes}
             nodeTree={nodeTree}
             selectedNodeId={selectedNodeId}
             pinnedNoteIds={pinnedNoteIds}

@@ -70,6 +70,7 @@ export interface WorkspaceSlice {
   createWorkspace: () => Promise<void>
   createFolder: (parentId?: string | null) => Promise<void>
   createNewNote: (parentId?: string | null) => Promise<void>
+  createInboxNote: (content: string) => Promise<string | null>
   createNoteFromTitle: (title: string, parentId?: string | null) => Promise<string | null>
   loadNotes: () => Promise<void>
   deleteNodeById: (id: string) => Promise<void>

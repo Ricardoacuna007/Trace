@@ -36,11 +36,12 @@ export function WorkspaceView({
   onCreateNote,
   onOpenNote,
 }: WorkspaceViewProps) {
-  const notes = nodes.filter((node) => node.type === 'note')
+  const visibleNodes = nodes.filter((node) => !node.inbox)
+  const notes = visibleNodes.filter((node) => node.type === 'note')
   const totalWords = notes.reduce((total, note) => (
     total + (typeof note.content === 'string' ? countWords(note.content) : 0)
   ), 0)
-  const recentItems = [...nodes]
+  const recentItems = [...visibleNodes]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 8)
 

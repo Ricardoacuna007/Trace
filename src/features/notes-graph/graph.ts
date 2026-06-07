@@ -170,7 +170,7 @@ async function generateGraphDataRust(): Promise<NoteGraphData> {
 function toNotes(nodes: AppNode[]): NoteLike[] {
   return nodes
     .filter((node): node is AppNode & { type: 'note'; content: string } => (
-      node.type === 'note' && typeof node.content === 'string'
+      node.type === 'note' && typeof node.content === 'string' && !node.inbox
     ))
     .map((node) => ({
       id: node.id,

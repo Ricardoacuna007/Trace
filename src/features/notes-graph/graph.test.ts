@@ -14,6 +14,7 @@ function note(id: string, title: string, text: string): AppNode {
         content: [{ type: 'text', text }],
       },
     ]),
+    inbox: false,
     position: 0,
     updatedAt: '2026-01-01T00:00:00.000Z',
   }

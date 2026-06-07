@@ -8,6 +8,7 @@ export interface AppNode {
   content?: string
   icon?: string
   tags?: string[]
+  inbox: boolean
   position: number
   updatedAt: string
 }

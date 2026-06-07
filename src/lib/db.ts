@@ -21,6 +21,7 @@ export {
   addNoteRelation,
   changeNodeIcon,
   commitNoteDraftSnapshot,
+  createInboxNote,
   createNode,
   deleteNode,
   listNoteRelations,

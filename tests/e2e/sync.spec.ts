@@ -19,6 +19,7 @@ test('pushes and pulls notes through the sync API', async ({ request }) => {
         content: '[]',
         icon: 'file-text',
         tags: [],
+        inbox: false,
         position: 0,
         updatedAt: new Date().toISOString(),
       }],

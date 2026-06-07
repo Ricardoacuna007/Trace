@@ -8,6 +8,7 @@ export interface NodeRow {
   content: string | null
   icon: string | null
   tags: string | null
+  inbox: number | boolean | null
   position: number
   updated_at: string
 }
@@ -106,6 +107,7 @@ export type NewNodeParams = {
   content?: string
   icon?: string | null
   tags?: string[]
+  inbox?: boolean
 }
 
 export type AppNoteNode = AppNode & {

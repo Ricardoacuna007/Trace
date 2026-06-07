@@ -22,6 +22,8 @@ pub struct Node {
     pub icon: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub inbox: bool,
     pub position: i64,
     pub updated_at: String,
 }

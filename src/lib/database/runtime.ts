@@ -64,6 +64,7 @@ export function mapNodeRow(row: NodeRow): AppNode {
     content: row.type === 'note' ? sanitizeStoredContent(row.content) : undefined,
     icon: row.icon ?? undefined,
     tags: row.type === 'note' ? parseTags(row.tags) : undefined,
+    inbox: Boolean(row.inbox),
     position: row.position,
     updatedAt: row.updated_at,
   }
@@ -152,16 +153,16 @@ async function migrateLegacyNotesIfNeeded(db: Database): Promise<void> {
   const createdAt = nowIso()
 
   await db.execute(
-    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-     VALUES ($1, $2, 'workspace', NULL, NULL, $3, '[]', 0, $4)`,
+    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+     VALUES ($1, $2, 'workspace', NULL, NULL, $3, '[]', 0, 0, $4)`,
     [workspaceId, DEFAULT_WORKSPACE_TITLE, DEFAULT_ICON_BY_TYPE.workspace, createdAt],
   )
 
   for (const [index, legacy] of legacyNotes.entries()) {
     const nodeId = createNodeId('note')
     await db.execute(
-      `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-       VALUES ($1, $2, 'note', $3, $4, $5, '[]', $6, $7)`,
+      `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+       VALUES ($1, $2, 'note', $3, $4, $5, '[]', 0, $6, $7)`,
       [
         nodeId,
         legacy.title?.trim() ? legacy.title : DEFAULT_NOTE_TITLE,
@@ -191,8 +192,8 @@ async function ensureDefaultWorkspace(db: Database): Promise<void> {
   const workspaceId = createNodeId('workspace')
 
   await db.execute(
-    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-     VALUES ($1, $2, 'workspace', NULL, NULL, $3, '[]', $4, $5)`,
+    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+     VALUES ($1, $2, 'workspace', NULL, NULL, $3, '[]', 0, $4, $5)`,
     [workspaceId, DEFAULT_WORKSPACE_TITLE, DEFAULT_ICON_BY_TYPE.workspace, nextPosition, nowIso()],
   )
 }
@@ -202,6 +203,14 @@ async function ensureTagsColumn(db: Database): Promise<void> {
   const hasTags = columns.some((column) => column.name === 'tags')
   if (!hasTags) {
     await db.execute("ALTER TABLE nodes ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'")
+  }
+}
+
+async function ensureInboxColumn(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(nodes)')
+  const hasInbox = columns.some((column) => column.name === 'inbox')
+  if (!hasInbox) {
+    await db.execute('ALTER TABLE nodes ADD COLUMN inbox INTEGER NOT NULL DEFAULT 0')
   }
 }
 
@@ -273,12 +282,14 @@ async function initializeSchema(db: Database): Promise<void> {
       content TEXT,
       icon TEXT,
       tags TEXT NOT NULL DEFAULT '[]',
+      inbox INTEGER NOT NULL DEFAULT 0,
       position INTEGER NOT NULL,
       updated_at TEXT NOT NULL
     )
   `)
 
   await ensureTagsColumn(db)
+  await ensureInboxColumn(db)
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS note_relations (
@@ -290,6 +301,7 @@ async function initializeSchema(db: Database): Promise<void> {
 
   await db.execute('CREATE INDEX IF NOT EXISTS idx_nodes_parent_position ON nodes(parent_id, position)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)')
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_nodes_inbox_updated ON nodes(inbox, updated_at)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_note_relations_source ON note_relations(source_id)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_note_relations_target ON note_relations(target_id)')
 

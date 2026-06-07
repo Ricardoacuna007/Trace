@@ -79,6 +79,7 @@ function note(id: string, title: string): AppNode {
     type: 'note',
     parentId: 'workspace-1',
     content: '[]',
+    inbox: false,
     position: 0,
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
@@ -97,6 +98,7 @@ function resetStore() {
         title: 'Workspace',
         type: 'workspace',
         parentId: null,
+        inbox: false,
         position: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
       },

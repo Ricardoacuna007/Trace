@@ -1,6 +1,7 @@
 import {
   addNoteRelation,
   changeNodeIcon as changeNodeIconInDb,
+  createInboxNote as createInboxNoteInDb,
   createNode,
   deleteNode,
   listNodes,
@@ -76,6 +77,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
   createWorkspace: () => Promise<void>
   createFolder: (parentId?: string | null) => Promise<void>
   createNewNote: (parentId?: string | null) => Promise<void>
+  createInboxNote: (content: string) => Promise<string | null>
   createNoteFromTitle: (title: string, parentId?: string | null) => Promise<string | null>
   loadNotes: () => Promise<void>
   deleteNodeById: (id: string) => Promise<void>
@@ -185,6 +187,36 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
       await get().refreshGraph(treeState.nodes)
     } catch (error) {
       set({ error: `No se pudo crear la nota: ${deps.normalizeError(error)}` })
+    }
+  },
+  createInboxNote: async (content) => {
+    const normalizedContent = content.trim()
+    if (!normalizedContent) {
+      set({ error: 'Escribe algo para capturar una nota.' })
+      return null
+    }
+
+    try {
+      const node = await createInboxNoteInDb(normalizedContent)
+      const nextNodes = [node, ...get().nodes]
+      const treeState = deps.withTree(nextNodes)
+
+      set({
+        ...treeState,
+        notes: notesFromNodes(treeState.nodes),
+        selectedNodeId: node.id,
+        activeNoteId: node.id,
+        activeView: 'editor',
+        viewMode: 'editor',
+        saveStatus: 'idle',
+        error: null,
+      })
+
+      await get().refreshGraph(treeState.nodes)
+      return node.id
+    } catch (error) {
+      set({ error: `No se pudo capturar la nota: ${deps.normalizeError(error)}` })
+      return null
     }
   },
   createNoteFromTitle: async (title, parentId) => {

@@ -73,7 +73,7 @@ fn load_notes_from_db(app_handle: &AppHandle) -> Result<Vec<NoteRecord>, String>
     };
 
     let mut statement = match connection
-    .prepare("SELECT id, title, content FROM nodes WHERE type = 'note' ORDER BY updated_at DESC, position ASC")
+    .prepare("SELECT id, title, content FROM nodes WHERE type = 'note' AND COALESCE(inbox, 0) = 0 ORDER BY updated_at DESC, position ASC")
   {
     Ok(statement) => statement,
     Err(error) => {

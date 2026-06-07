@@ -76,9 +76,10 @@ function buildNodeTree(nodes: AppNode[]): TreeNode[] {
 
 export function withTree(nodes: AppNode[]): { nodes: AppNode[]; nodeTree: TreeNode[] } {
   const ordered = sortNodes(nodes)
+  const workspaceNodes = ordered.filter((node) => !node.inbox)
   return {
     nodes: ordered,
-    nodeTree: buildNodeTree(ordered),
+    nodeTree: buildNodeTree(workspaceNodes),
   }
 }
 

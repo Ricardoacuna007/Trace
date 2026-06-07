@@ -16,6 +16,7 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
         content TEXT,
         icon TEXT,
         tags TEXT NOT NULL DEFAULT '[]',
+        inbox INTEGER NOT NULL DEFAULT 0,
         position INTEGER NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -93,6 +94,19 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
         "tags",
         "ALTER TABLE nodes ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
     )?;
+    ensure_column(
+        connection,
+        "nodes",
+        "inbox",
+        "ALTER TABLE nodes ADD COLUMN inbox INTEGER NOT NULL DEFAULT 0",
+    )?;
+
+    connection
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_nodes_inbox_updated ON nodes(inbox, updated_at)",
+            [],
+        )
+        .map_err(|error| format!("No se pudo crear indice idx_nodes_inbox_updated: {error}"))?;
 
     let _ = ensure_nodes_fts_schema(connection);
     Ok(())
@@ -219,6 +233,7 @@ mod tests {
         assert!(table_exists(&connection, "sync_log"));
         assert!(table_exists(&connection, "backup_history"));
         assert!(index_exists(&connection, "idx_nodes_parent_position"));
+        assert!(index_exists(&connection, "idx_nodes_inbox_updated"));
         assert!(index_exists(&connection, "idx_refresh_tokens_expires_at"));
         assert!(index_exists(&connection, "idx_audit_log_created_at"));
         assert!(index_exists(&connection, "idx_sync_log_status"));
@@ -231,6 +246,7 @@ mod tests {
             1
         );
         assert!(has_column(&connection, "nodes", "tags").expect("tags column check works"));
+        assert!(has_column(&connection, "nodes", "inbox").expect("inbox column check works"));
     }
 
     #[test]
@@ -256,6 +272,7 @@ mod tests {
         ensure_trace_schema(&connection).expect("legacy schema migrates");
 
         assert!(has_column(&connection, "nodes", "tags").expect("tags column check works"));
+        assert!(has_column(&connection, "nodes", "inbox").expect("inbox column check works"));
     }
 
     #[test]

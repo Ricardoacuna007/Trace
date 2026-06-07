@@ -202,8 +202,8 @@ fn upsert_note(connection: &Connection, note: &Node) -> Result<()> {
     let tags_json = serde_json::to_string(&note.tags).context("No se pudieron serializar tags")?;
     connection
         .execute(
-            "INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              ON CONFLICT(id) DO UPDATE SET
                title = excluded.title,
                type = excluded.type,
@@ -211,6 +211,7 @@ fn upsert_note(connection: &Connection, note: &Node) -> Result<()> {
                content = excluded.content,
                icon = excluded.icon,
                tags = excluded.tags,
+               inbox = excluded.inbox,
                position = excluded.position,
                updated_at = excluded.updated_at",
             params![
@@ -221,6 +222,7 @@ fn upsert_note(connection: &Connection, note: &Node) -> Result<()> {
                 note.content.as_deref(),
                 note.icon.as_deref(),
                 tags_json,
+                if note.inbox { 1 } else { 0 },
                 note.position,
                 note.updated_at.as_str()
             ],

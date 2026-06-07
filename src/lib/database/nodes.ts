@@ -16,7 +16,7 @@ import type { NewNodeParams, NodeRow, RelationRow } from './types'
 export async function listNodes(): Promise<AppNode[]> {
   const db = await getDatabase()
   const rows = await db.select<NodeRow[]>(
-    `SELECT id, title, type, parent_id, content, icon, tags, position, updated_at
+    `SELECT id, title, type, parent_id, content, icon, tags, inbox, position, updated_at
      FROM nodes
      ORDER BY parent_id IS NULL DESC, parent_id, position, updated_at DESC`,
   )
@@ -44,11 +44,12 @@ export async function createNode(params: NewNodeParams): Promise<AppNode> {
     : null
   const icon = params.icon ?? DEFAULT_ICON_BY_TYPE[params.type] ?? null
   const tags = params.type === 'note' ? toStoredTags(params.tags ?? []) : '[]'
+  const inbox = params.type === 'note' && params.inbox === true
 
   await db.execute(
-    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [id, title, params.type, parentId, content, icon, tags, position, updatedAt],
+    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [id, title, params.type, parentId, content, icon, tags, inbox ? 1 : 0, position, updatedAt],
   )
 
   return {
@@ -59,9 +60,31 @@ export async function createNode(params: NewNodeParams): Promise<AppNode> {
     content: params.type === 'note' ? content ?? EMPTY_NOTE_CONTENT : undefined,
     icon: icon ?? undefined,
     tags: params.type === 'note' ? parseTags(tags) : undefined,
+    inbox,
     position,
     updatedAt,
   }
+}
+
+export async function createInboxNote(contentText: string): Promise<AppNode> {
+  const lines = contentText.replace(/\r/g, '').split('\n')
+  const firstLine = lines.find((line) => line.trim().length > 0)?.trim() ?? DEFAULT_NOTE_TITLE
+  const title = firstLine || DEFAULT_NOTE_TITLE
+  const blocks = lines.length > 0 ? lines : ['']
+  const content = JSON.stringify(blocks.map((line) => ({
+    type: 'paragraph',
+    content: line,
+  })))
+
+  return createNode({
+    type: 'note',
+    parentId: null,
+    title,
+    content,
+    icon: 'inbox',
+    tags: [],
+    inbox: true,
+  })
 }
 
 export async function renameNode(id: string, title: string): Promise<{ updatedAt: string }> {
@@ -121,8 +144,8 @@ export async function upsertSyncedNote(note: Note): Promise<void> {
   const parentId = note.parentId && await nodeExists(note.parentId) ? note.parentId : null
 
   await db.execute(
-    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-     VALUES ($1, $2, 'note', $3, $4, $5, $6, $7, $8)
+    `INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+     VALUES ($1, $2, 'note', $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT(id) DO UPDATE SET
        title = excluded.title,
        type = excluded.type,
@@ -130,6 +153,7 @@ export async function upsertSyncedNote(note: Note): Promise<void> {
        content = excluded.content,
        icon = excluded.icon,
        tags = excluded.tags,
+       inbox = excluded.inbox,
        position = excluded.position,
        updated_at = excluded.updated_at`,
     [
@@ -139,6 +163,7 @@ export async function upsertSyncedNote(note: Note): Promise<void> {
       sanitizeStoredContent(note.content),
       note.icon ?? 'note',
       toStoredTags(note.tags ?? []),
+      note.inbox ? 1 : 0,
       note.position,
       note.updatedAt,
     ],
@@ -237,7 +262,7 @@ export async function moveNode(
 
   await db.execute(
     `UPDATE nodes
-     SET parent_id = $1, position = $2, updated_at = $3
+     SET parent_id = $1, inbox = CASE WHEN $1 IS NULL THEN inbox ELSE 0 END, position = $2, updated_at = $3
      WHERE id = $4`,
     [newParentId, position, updatedAt, id],
   )

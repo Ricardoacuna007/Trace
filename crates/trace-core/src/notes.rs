@@ -17,6 +17,8 @@ pub struct CreateNoteInput {
     pub content: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub inbox: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -27,6 +29,8 @@ pub struct UpdateNoteInput {
     pub parent_id: Option<String>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub inbox: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -37,7 +41,7 @@ pub struct DeletedResponse {
 
 pub fn list_nodes(connection: &Connection) -> Result<Vec<Node>, rusqlite::Error> {
     let mut statement = connection.prepare(
-        "SELECT id, title, type, parent_id, content, icon, tags, position, updated_at
+        "SELECT id, title, type, parent_id, content, icon, tags, inbox, position, updated_at
          FROM nodes
          ORDER BY parent_id IS NULL DESC, parent_id, position, updated_at DESC",
     )?;
@@ -48,7 +52,7 @@ pub fn list_nodes(connection: &Connection) -> Result<Vec<Node>, rusqlite::Error>
 
 pub fn list_notes(connection: &Connection) -> Result<Vec<Node>, rusqlite::Error> {
     let mut statement = connection.prepare(
-        "SELECT id, title, type, parent_id, content, icon, tags, position, updated_at
+        "SELECT id, title, type, parent_id, content, icon, tags, inbox, position, updated_at
          FROM nodes
          WHERE type = 'note'
          ORDER BY updated_at DESC, position ASC",
@@ -61,7 +65,7 @@ pub fn list_notes(connection: &Connection) -> Result<Vec<Node>, rusqlite::Error>
 pub fn get_note(connection: &Connection, id: &str) -> Result<Option<Node>, rusqlite::Error> {
     connection
         .query_row(
-            "SELECT id, title, type, parent_id, content, icon, tags, position, updated_at
+            "SELECT id, title, type, parent_id, content, icon, tags, inbox, position, updated_at
              FROM nodes
              WHERE id = ?1 AND type = 'note'",
             [id],
@@ -84,9 +88,18 @@ pub fn create_note(
     let tags_json = serialize_tags(&tags);
 
     connection.execute(
-        "INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, position, updated_at)
-         VALUES (?1, ?2, 'note', ?3, ?4, 'file-text', ?5, ?6, ?7)",
-        params![id, title, parent_id, content, tags_json, position, now],
+        "INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+         VALUES (?1, ?2, 'note', ?3, ?4, 'file-text', ?5, ?6, ?7, ?8)",
+        params![
+            id,
+            title,
+            parent_id,
+            content,
+            tags_json,
+            if input.inbox { 1 } else { 0 },
+            position,
+            now
+        ],
     )?;
 
     get_note(connection, &id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
@@ -114,14 +127,23 @@ pub fn update_note(
         .unwrap_or_else(|| EMPTY_NOTE_CONTENT.to_string());
     let tags = input.tags.map(normalize_tags).unwrap_or(current.tags);
     let parent_id = input.parent_id.or(current.parent_id);
+    let inbox = input.inbox.unwrap_or(current.inbox);
     let now = now_iso();
     let tags_json = serialize_tags(&tags);
 
     connection.execute(
         "UPDATE nodes
-         SET title = ?1, content = ?2, parent_id = ?3, tags = ?4, updated_at = ?5
-         WHERE id = ?6 AND type = 'note'",
-        params![title, content, parent_id, tags_json, now, id],
+         SET title = ?1, content = ?2, parent_id = ?3, tags = ?4, inbox = ?5, updated_at = ?6
+         WHERE id = ?7 AND type = 'note'",
+        params![
+            title,
+            content,
+            parent_id,
+            tags_json,
+            if inbox { 1 } else { 0 },
+            now,
+            id
+        ],
     )?;
 
     get_note(connection, id)
@@ -186,6 +208,7 @@ fn map_node_row(row: &rusqlite::Row<'_>) -> Result<Node, rusqlite::Error> {
         _ => NodeType::Note,
     };
     let tags_json: String = row.get(6)?;
+    let inbox: i64 = row.get(7)?;
 
     Ok(Node {
         id: row.get(0)?,
@@ -195,8 +218,9 @@ fn map_node_row(row: &rusqlite::Row<'_>) -> Result<Node, rusqlite::Error> {
         content: row.get(4)?,
         icon: row.get(5)?,
         tags: parse_tags(&tags_json),
-        position: row.get(7)?,
-        updated_at: row.get(8)?,
+        inbox: inbox != 0,
+        position: row.get(8)?,
+        updated_at: row.get(9)?,
     })
 }
 
@@ -295,6 +319,7 @@ mod tests {
                     "#rust".to_string(),
                     "Trace".to_string(),
                 ],
+                inbox: true,
             },
         )
         .expect("note is created");
@@ -302,6 +327,7 @@ mod tests {
         assert_eq!(note.title, "My Note");
         assert_eq!(note.node_type, NodeType::Note);
         assert_eq!(note.tags, vec!["rust", "trace"]);
+        assert!(note.inbox);
 
         let updated = update_note(
             &connection,
@@ -311,6 +337,7 @@ mod tests {
                 content: Some("not json".to_string()),
                 parent_id: None,
                 tags: Some(vec!["pkm".to_string()]),
+                inbox: Some(false),
             },
         )
         .expect("update succeeds")
@@ -319,6 +346,7 @@ mod tests {
         assert_eq!(updated.title, "Updated");
         assert_eq!(updated.content.as_deref(), Some(EMPTY_NOTE_CONTENT));
         assert_eq!(updated.tags, vec!["pkm"]);
+        assert!(!updated.inbox);
 
         let target = create_note(
             &connection,
@@ -327,6 +355,7 @@ mod tests {
                 parent_id: None,
                 content: None,
                 tags: Vec::new(),
+                inbox: false,
             },
         )
         .expect("target is created");

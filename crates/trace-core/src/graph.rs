@@ -33,7 +33,7 @@ pub struct GraphData {
 pub fn build_note_graph(nodes_input: &[Node], explicit_relations: &[NoteRelation]) -> GraphData {
     let notes = nodes_input
         .iter()
-        .filter(|node| node.node_type == NodeType::Note)
+        .filter(|node| node.node_type == NodeType::Note && !node.inbox)
         .collect::<Vec<_>>();
 
     if notes.is_empty() {
@@ -246,6 +246,7 @@ mod tests {
             content: Some(content.to_string()),
             icon: None,
             tags: Vec::new(),
+            inbox: false,
             position: 0,
             updated_at: "now".to_string(),
         }
