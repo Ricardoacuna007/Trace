@@ -47,6 +47,11 @@ Corre sobre Tauri 2 (Rust + WebView) con frontend React.
 - Importacion y exportacion Markdown
 - Exportacion PDF via imprimir (`window.print`)
 
+## Roadmap y feedback
+
+- Roadmap v0.3: [docs/v0.3-roadmap.md](docs/v0.3-roadmap.md)
+- Feedback de testers: [docs/feedback-log.md](docs/feedback-log.md)
+
 ## Requisitos
 
 - Node.js 18+ (recomendado 20+)

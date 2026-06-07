@@ -1,0 +1,54 @@
+name: Bug report
+description: Reporta un problema reproducible de Trace.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Ejemplo: v0.2.3
+      placeholder: v0.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Superficie
+      options:
+        - Desktop
+        - Web self-host
+        - Docker/server
+        - Linux build
+        - Windows build
+        - Otro
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      description: Escribe los pasos concretos.
+      placeholder: |
+        1. Abrir Trace
+        2. Crear una nota con titulo largo
+        3. Ver que el titulo no se muestra bien
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado actual
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: Capturas, sistema operativo, logs o detalles utiles.

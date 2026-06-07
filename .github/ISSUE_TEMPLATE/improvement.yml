@@ -1,0 +1,35 @@
+name: Mejora o idea
+description: Propone una mejora de producto, UI o flujo.
+title: "[Mejora]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema
+      description: Que friccion resuelve esta mejora.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Como deberia comportarse Trace.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioridad sugerida
+      options:
+        - P0 - Bloqueante
+        - P1 - Importante para uso comun
+        - P2 - Polish
+        - P3 - Futuro
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notas adicionales
+      description: Referencias, capturas o alternativas.
