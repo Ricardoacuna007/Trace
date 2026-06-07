@@ -121,6 +121,28 @@ function DesktopApp() {
     void initialize()
   }, [initialize])
 
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+
+    void import('@tauri-apps/api/event')
+      .then(({ listen }) => listen('trace-inbox-note-created', () => {
+        void loadNotes()
+      }))
+      .then((dispose) => {
+        if (cancelled) {
+          dispose()
+          return
+        }
+        unlisten = dispose
+      })
+
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [loadNotes])
+
   const {
     breadcrumbs,
     isActiveNoteDirty,

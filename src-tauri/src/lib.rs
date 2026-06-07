@@ -12,6 +12,7 @@ pub fn run() {
             commands::markdown_io::export_note_markdown,
             commands::markdown_io::export_vault_markdown,
             commands::markdown_io::import_markdown_directory,
+            commands::quick_capture::create_inbox_note,
             commands::search::search_notes,
             commands::search::get_backlinks,
             commands::vault::get_active_vault,
@@ -20,6 +21,33 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_global_shortcut::{
+                    Code, GlobalShortcutExt, Modifiers, ShortcutState,
+                };
+
+                app.handle()
+                    .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
+
+                if let Err(error) =
+                    app.global_shortcut()
+                        .on_shortcut("ctrl+space", |app, shortcut, event| {
+                            if event.state == ShortcutState::Pressed
+                                && shortcut.matches(Modifiers::CONTROL, Code::Space)
+                            {
+                                if let Err(error) =
+                                    commands::quick_capture::show_quick_capture_window(app)
+                                {
+                                    log::error!("quick capture shortcut failed: {error}");
+                                }
+                            }
+                        })
+                {
+                    log::warn!("quick capture shortcut unavailable: {error}");
+                }
+            }
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

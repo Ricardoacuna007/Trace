@@ -3,9 +3,12 @@ import { MantineProvider } from '@mantine/core'
 import '@mantine/core/styles.css'
 import './index.css'
 import App from './App.tsx'
+import { QuickCaptureWindow } from './app/quick-capture/QuickCaptureWindow.tsx'
 import { EnvProvider } from './lib/env'
 
 document.documentElement.classList.add('dark')
+
+const isQuickCaptureWindow = new URLSearchParams(window.location.search).get('window') === 'quick-capture'
 
 function renderFatalError(message: string) {
   const root = document.getElementById('root')
@@ -36,7 +39,7 @@ window.addEventListener('unhandledrejection', (event) => {
 createRoot(document.getElementById('root')!).render(
   <MantineProvider forceColorScheme="dark">
     <EnvProvider>
-      <App />
+      {isQuickCaptureWindow ? <QuickCaptureWindow /> : <App />}
     </EnvProvider>
   </MantineProvider>,
 )

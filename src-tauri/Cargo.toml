@@ -29,3 +29,4 @@ rusqlite = { version = "0.32.1", features = ["bundled"] }
 regex = "1.11.1"
 deunicode = "1.6.2"
 tauri-plugin-dialog = "2.7.1"
+tauri-plugin-global-shortcut = "2"
