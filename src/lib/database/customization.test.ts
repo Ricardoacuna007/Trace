@@ -24,4 +24,29 @@ describe('parseTraceConfig', () => {
       enable_autosave: true,
     })
   })
+
+  it('normalizes layout defaults from partial config', () => {
+    const config = parseTraceConfig(JSON.stringify({
+      layout: {
+        sidebar_position: 'right',
+        visible_elements: {
+          metabar: false,
+          word_count: false,
+        },
+      },
+    }))
+
+    expect(config.layout).toEqual({
+      sidebar_position: 'right',
+      right_panel: 'visible',
+      visible_elements: {
+        breadcrumb: true,
+        metabar: false,
+        word_count: false,
+        modified_at: true,
+        titlebar: true,
+        traffic_lights: true,
+      },
+    })
+  })
 })

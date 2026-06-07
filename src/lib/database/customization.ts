@@ -1,6 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauriRuntime } from './runtime'
-import type { TraceConfig, TraceUIModules, VaultCustomization } from './types'
+import type {
+  TraceConfig,
+  TraceLayoutConfig,
+  TraceRightPanelMode,
+  TraceSidebarPosition,
+  TraceUIModules,
+  TraceVisibleElements,
+  VaultCustomization,
+} from './types'
 
 function parseStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -22,6 +30,19 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     show_node_icons: true,
     enable_autosave: true,
   }
+  const defaultVisibleElements: TraceVisibleElements = {
+    breadcrumb: true,
+    metabar: true,
+    word_count: true,
+    modified_at: true,
+    titlebar: true,
+    traffic_lights: true,
+  }
+  const defaultLayout: TraceLayoutConfig = {
+    sidebar_position: 'left',
+    right_panel: 'visible',
+    visible_elements: defaultVisibleElements,
+  }
 
   const fallback: TraceConfig = {
     theme: 'dark',
@@ -29,6 +50,7 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     font_family: 'DM Sans',
     editor_width: 'centered',
     vim_mode: false,
+    layout: defaultLayout,
     ui_modules: defaultUiModules,
     pinned_note_ids: [],
   }
@@ -46,6 +68,14 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     const editorWidth = typeof config.editor_width === 'string'
       ? config.editor_width
       : fallback.editor_width
+    const rawLayout = config.layout && typeof config.layout === 'object'
+      ? config.layout as Record<string, unknown>
+      : {}
+    const rawVisibleElements = rawLayout.visible_elements && typeof rawLayout.visible_elements === 'object'
+      ? rawLayout.visible_elements as Record<string, unknown>
+      : {}
+    const sidebarPosition = normalizeSidebarPosition(rawLayout.sidebar_position, defaultLayout.sidebar_position)
+    const rightPanel = normalizeRightPanel(rawLayout.right_panel, defaultLayout.right_panel)
 
     return {
       ...fallback,
@@ -56,6 +86,19 @@ export function parseTraceConfig(configJson: string): TraceConfig {
       editor_width: editorWidth === 'full' ? 'full' : editorWidth === 'centered' ? 'centered' : editorWidth,
       vim_mode: Boolean(config.vim_mode),
       pinned_note_ids: parseStringArray(config.pinned_note_ids),
+      layout: {
+        sidebar_position: sidebarPosition,
+        right_panel: rightPanel,
+        visible_elements: {
+          ...defaultVisibleElements,
+          breadcrumb: Boolean(rawVisibleElements.breadcrumb ?? defaultVisibleElements.breadcrumb),
+          metabar: Boolean(rawVisibleElements.metabar ?? defaultVisibleElements.metabar),
+          word_count: Boolean(rawVisibleElements.word_count ?? defaultVisibleElements.word_count),
+          modified_at: Boolean(rawVisibleElements.modified_at ?? defaultVisibleElements.modified_at),
+          titlebar: Boolean(rawVisibleElements.titlebar ?? defaultVisibleElements.titlebar),
+          traffic_lights: Boolean(rawVisibleElements.traffic_lights ?? defaultVisibleElements.traffic_lights),
+        },
+      },
       ui_modules: {
         ...defaultUiModules,
         show_breadcrumbs: Boolean(uiModulesRecord.show_breadcrumbs ?? defaultUiModules.show_breadcrumbs),
@@ -67,6 +110,14 @@ export function parseTraceConfig(configJson: string): TraceConfig {
   } catch {
     return fallback
   }
+}
+
+function normalizeSidebarPosition(value: unknown, fallback: TraceSidebarPosition): TraceSidebarPosition {
+  return value === 'left' || value === 'right' || value === 'hidden' ? value : fallback
+}
+
+function normalizeRightPanel(value: unknown, fallback: TraceRightPanelMode): TraceRightPanelMode {
+  return value === 'visible' || value === 'collapsed' || value === 'hidden' ? value : fallback
 }
 
 export async function readVaultCustomization(): Promise<VaultCustomization> {

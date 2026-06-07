@@ -47,12 +47,31 @@ export interface TraceUIModules {
   enable_autosave: boolean
 }
 
+export type TraceSidebarPosition = 'left' | 'right' | 'hidden'
+export type TraceRightPanelMode = 'visible' | 'collapsed' | 'hidden'
+
+export interface TraceVisibleElements {
+  breadcrumb: boolean
+  metabar: boolean
+  word_count: boolean
+  modified_at: boolean
+  titlebar: boolean
+  traffic_lights: boolean
+}
+
+export interface TraceLayoutConfig {
+  sidebar_position: TraceSidebarPosition
+  right_panel: TraceRightPanelMode
+  visible_elements: TraceVisibleElements
+}
+
 export interface TraceConfig {
   theme: 'dark' | 'light'
   accent_color: string
   font_family: string
   editor_width: 'full' | 'centered' | string
   vim_mode: boolean
+  layout: TraceLayoutConfig
   ui_modules: TraceUIModules
   pinned_note_ids: string[]
   [key: string]: unknown

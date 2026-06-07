@@ -1,7 +1,7 @@
 ﻿import type { Block } from '@blocknote/core'
 import { Suspense, lazy } from 'react'
 import type { NoteGraphData } from '../../features/notes-graph/graph'
-import type { MarkdownDbSnapshot, NoteBacklink, TraceUIModules } from '../../lib/db'
+import type { MarkdownDbSnapshot, NoteBacklink, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../../store/types'
 import type { Note } from '../../types/note'
 import type { AppNode, TreeNode as WorkspaceTreeNode } from '../../types/workspace'
@@ -56,6 +56,10 @@ interface AppShellProps {
   selectedNote: Note | null
   traceConfigJson: string
   traceDir: string | null
+  traceTheme: 'dark' | 'light'
+  traceAccentColor: string
+  traceFontFamily: string
+  traceLayout: TraceLayoutConfig
   uiModules: TraceUIModules
   viewMode: ViewMode
   renderConnectModal?: boolean
@@ -79,6 +83,12 @@ interface AppShellProps {
   onSetActiveView: (view: AppViewMode) => void
   onSetEditorWidth: (width: 'full' | 'centered') => void
   onTitleChange: (noteId: string, title: string) => void
+  onUpdateTraceAppearance: (patch: Partial<{
+    theme: 'dark' | 'light'
+    accent_color: string
+    font_family: string
+  }>) => void
+  onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
   onTogglePropertiesPanel: () => void
   onUnpinNote: (noteId: string) => void
@@ -145,6 +155,10 @@ export function AppShell({
   selectedNote,
   traceConfigJson,
   traceDir,
+  traceTheme,
+  traceAccentColor,
+  traceFontFamily,
+  traceLayout,
   uiModules,
   viewMode,
   renderConnectModal = true,
@@ -168,6 +182,8 @@ export function AppShell({
   onSetActiveView,
   onSetEditorWidth,
   onTitleChange,
+  onUpdateTraceAppearance,
+  onUpdateTraceLayout,
   onToggleModule,
   onTogglePropertiesPanel,
   onUnpinNote,
@@ -183,26 +199,35 @@ export function AppShell({
   const inboxNotes = nodes
     .filter((node): node is Note => node.type === 'note' && typeof node.content === 'string' && node.inbox)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const sidebarVisible = isSidebarOpen && traceLayout.sidebar_position !== 'hidden'
+  const sidebar = sidebarVisible ? (
+    <Sidebar
+      inboxNotes={inboxNotes}
+      nodeTree={nodeTree}
+      selectedNodeId={selectedNodeId}
+      pinnedNoteIds={pinnedNoteIds}
+      showNodeIcons={uiModules.show_node_icons}
+      onCreateNote={onCreateNote}
+      onOpenCommandPalette={onOpenCommandPalette}
+      onPinNote={onPinNote}
+      onSelectNode={onOpenNode}
+      onSetWorkspaceView={() => onSetActiveView('workspace')}
+      onUnpinNote={onUnpinNote}
+    />
+  ) : null
 
   return (
     <div className="app-shell flex h-screen flex-col overflow-hidden bg-[var(--bg)] text-[var(--t1)]">
-      <TitleBar activeView={activeView} workspaceTitle={workspaceTitle} onSetActiveView={onSetActiveView} />
+      {traceLayout.visible_elements.titlebar ? (
+        <TitleBar
+          activeView={activeView}
+          workspaceTitle={workspaceTitle}
+          showTrafficLights={traceLayout.visible_elements.traffic_lights}
+          onSetActiveView={onSetActiveView}
+        />
+      ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {isSidebarOpen ? (
-          <Sidebar
-            inboxNotes={inboxNotes}
-            nodeTree={nodeTree}
-            selectedNodeId={selectedNodeId}
-            pinnedNoteIds={pinnedNoteIds}
-            showNodeIcons={uiModules.show_node_icons}
-            onCreateNote={onCreateNote}
-            onOpenCommandPalette={onOpenCommandPalette}
-            onPinNote={onPinNote}
-            onSelectNode={onOpenNode}
-            onSetWorkspaceView={() => onSetActiveView('workspace')}
-            onUnpinNote={onUnpinNote}
-          />
-        ) : null}
+        {traceLayout.sidebar_position === 'left' ? sidebar : null}
 
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {viewMode === 'settings' ? (
@@ -210,6 +235,10 @@ export function AppShell({
               <LazySettingsView
                 vaultPath={activeVaultPath}
                 traceDir={traceDir}
+                traceTheme={traceTheme}
+                traceAccentColor={traceAccentColor}
+                traceFontFamily={traceFontFamily}
+                traceLayout={traceLayout}
                 configJson={traceConfigJson}
                 customCss={customCss}
                 customizationLoading={customizationLoading}
@@ -228,6 +257,8 @@ export function AppShell({
                 onPrintCurrentNote={onPrintCurrentNote}
                 onReloadWorkspace={onReloadWorkspace}
                 onSetEditorWidth={onSetEditorWidth}
+                onUpdateTraceAppearance={onUpdateTraceAppearance}
+                onUpdateTraceLayout={onUpdateTraceLayout}
                 onToggleModule={onToggleModule}
               />
             </Suspense>
@@ -259,24 +290,25 @@ export function AppShell({
             />
           ) : (
             <>
-              {uiModules.show_breadcrumbs ? (
-                <NoteHeader
-                  breadcrumbs={breadcrumbs}
+              <NoteHeader
+                breadcrumbs={breadcrumbs}
+                note={selectedNote}
+                showBreadcrumb={uiModules.show_breadcrumbs && traceLayout.visible_elements.breadcrumb}
+                propertiesPanelOpen={isPropertiesPanelOpen}
+                onExportMarkdown={onExportCurrentNoteMarkdown}
+                onOpenCommandPalette={onOpenCommandPalette}
+                onOpenConnectModal={onOpenConnectModal}
+                onPrintCurrentNote={onPrintCurrentNote}
+                onTogglePropertiesPanel={onTogglePropertiesPanel}
+              />
+              {traceLayout.visible_elements.metabar ? (
+                <NoteMetaBar
                   note={selectedNote}
-                  propertiesPanelOpen={isPropertiesPanelOpen}
-                  onExportMarkdown={onExportCurrentNoteMarkdown}
-                  onOpenCommandPalette={onOpenCommandPalette}
+                  isPinned={pinned}
+                  connectionCount={connectionCount}
                   onOpenConnectModal={onOpenConnectModal}
-                  onPrintCurrentNote={onPrintCurrentNote}
-                  onTogglePropertiesPanel={onTogglePropertiesPanel}
                 />
               ) : null}
-              <NoteMetaBar
-                note={selectedNote}
-                isPinned={pinned}
-                connectionCount={connectionCount}
-                onOpenConnectModal={onOpenConnectModal}
-              />
               <EditorLayout
                 backlinks={backlinks}
                 nodes={nodes}
@@ -284,8 +316,11 @@ export function AppShell({
                 noteRelations={noteRelations}
                 recentConnectionIds={recentConnectionIds}
                 editorWidth={editorWidth}
+                rightPanelMode={traceLayout.right_panel}
                 showBacklinks={uiModules.show_backlinks && isBacklinksPanelOpen}
+                showModifiedAt={traceLayout.visible_elements.modified_at}
                 showProperties={isPropertiesPanelOpen}
+                showWordCount={traceLayout.visible_elements.word_count}
                 onContentChange={onContentChange}
                 onOpenWikiLink={onOpenWikiLink}
                 onSelectNode={onOpenNode}
@@ -295,6 +330,7 @@ export function AppShell({
             </>
           )}
         </main>
+        {traceLayout.sidebar_position === 'right' ? sidebar : null}
       </div>
       {renderConnectModal ? <ConnectNoteModal /> : null}
     </div>

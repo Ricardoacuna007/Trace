@@ -17,6 +17,7 @@ import type { AppNode } from '../../types/workspace'
 interface NoteHeaderProps {
   breadcrumbs: AppNode[]
   note: Note
+  showBreadcrumb: boolean
   propertiesPanelOpen: boolean
   onExportMarkdown: () => void
   onOpenCommandPalette: () => void
@@ -75,6 +76,7 @@ function MenuActionButton({ icon: Icon, label, onClick }: MenuActionButtonProps)
 export function NoteHeader({
   breadcrumbs,
   note,
+  showBreadcrumb,
   propertiesPanelOpen,
   onExportMarkdown,
   onOpenCommandPalette,
@@ -135,7 +137,7 @@ export function NoteHeader({
   return (
     <header className="relative flex h-[var(--header-h)] shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-4">
       <div className="flex min-w-0 items-center gap-1 text-[12px] text-[var(--t2)]">
-        {breadcrumbs.map((item, index) => (
+        {showBreadcrumb ? breadcrumbs.map((item, index) => (
           <div key={item.id} className="flex min-w-0 items-center gap-1" title={item.title}>
             {index === 0 ? <Folder className="h-3.5 w-3.5 shrink-0 text-[var(--amber)]" /> : null}
             <span className={index === breadcrumbs.length - 1 ? 'max-w-[44vw] truncate text-[var(--t1)]' : 'max-w-[18vw] truncate'}>
@@ -143,7 +145,7 @@ export function NoteHeader({
             </span>
             {index < breadcrumbs.length - 1 ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--t3)]" /> : null}
           </div>
-        ))}
+        )) : null}
       </div>
 
       <div ref={menuRef} className="relative flex items-center gap-1">

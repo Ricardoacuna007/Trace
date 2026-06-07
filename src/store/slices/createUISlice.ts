@@ -1,4 +1,10 @@
-import { parseTraceConfig, saveVaultCustomization as saveVaultCustomizationInDb, type TraceUIModules } from '../../lib/db'
+import {
+  parseTraceConfig,
+  saveVaultCustomization as saveVaultCustomizationInDb,
+  type TraceConfig,
+  type TraceLayoutConfig,
+  type TraceUIModules,
+} from '../../lib/db'
 import type { NotesState, SliceCreator, UISlice } from '../types'
 
 interface UISliceDeps {
@@ -14,20 +20,21 @@ async function persistUIConfig(
   set: (partial: Partial<NotesState>) => void,
   get: () => NotesState,
   deps: UISliceDeps,
-  nextEditorWidth: 'full' | 'centered',
-  nextModules: TraceUIModules,
+  updater: (config: TraceConfig) => TraceConfig,
 ) {
   const currentState = get()
   const baseConfig = parseTraceConfig(currentState.traceConfigJson || deps.defaultTraceConfigJson)
-  const nextConfig = {
-    ...baseConfig,
-    editor_width: nextEditorWidth,
-    ui_modules: nextModules,
-  }
+  const nextConfig = updater(baseConfig)
   const nextConfigJson = JSON.stringify(nextConfig, null, 2)
 
   set({
     traceConfigJson: nextConfigJson,
+    traceTheme: nextConfig.theme,
+    traceAccentColor: nextConfig.accent_color,
+    traceFontFamily: nextConfig.font_family,
+    traceLayout: nextConfig.layout,
+    editorWidth: toEditorWidthMode(nextConfig.editor_width),
+    uiModules: nextConfig.ui_modules,
   })
 
   if (currentState.vaultRequired || !currentState.activeVaultPath) {
@@ -50,6 +57,10 @@ async function persistUIConfig(
 }
 
 export const createUISlice = (deps: UISliceDeps): SliceCreator<UISlice> => (set, get) => ({
+  traceTheme: 'dark',
+  traceAccentColor: '#5e8bff',
+  traceFontFamily: 'DM Sans',
+  traceLayout: parseTraceConfig(deps.defaultTraceConfigJson).layout,
   editorWidth: 'centered',
   isSidebarOpen: true,
   isPropertiesPanelOpen: true,
@@ -64,6 +75,10 @@ export const createUISlice = (deps: UISliceDeps): SliceCreator<UISlice> => (set,
   hydrateUIFromConfig: (configJson) => {
     const parsed = parseTraceConfig(configJson || deps.defaultTraceConfigJson)
     set((state) => ({
+      traceTheme: parsed.theme,
+      traceAccentColor: parsed.accent_color,
+      traceFontFamily: parsed.font_family,
+      traceLayout: parsed.layout,
       editorWidth: toEditorWidthMode(parsed.editor_width),
       pinnedNoteIds: parsed.pinned_note_ids,
       uiModules: parsed.ui_modules,
@@ -85,6 +100,30 @@ export const createUISlice = (deps: UISliceDeps): SliceCreator<UISlice> => (set,
   closeConnectModal: () => {
     set({ isConnectModalOpen: false })
   },
+  updateTraceAppearance: async (patch) => {
+    await persistUIConfig(set, get, deps, (config) => ({
+      ...config,
+      theme: patch.theme ?? config.theme,
+      accent_color: patch.accent_color ?? config.accent_color,
+      font_family: patch.font_family ?? config.font_family,
+    }))
+  },
+  updateTraceLayout: async (layout) => {
+    const normalizedLayout: TraceLayoutConfig = {
+      ...layout,
+      visible_elements: {
+        ...layout.visible_elements,
+      },
+    }
+    set({
+      traceLayout: normalizedLayout,
+      isPropertiesPanelOpen: normalizedLayout.right_panel === 'visible',
+    })
+    await persistUIConfig(set, get, deps, (config) => ({
+      ...config,
+      layout: normalizedLayout,
+    }))
+  },
   updateUIModule: async (module, value) => {
     const current = get()
     const nextModules: TraceUIModules = {
@@ -99,11 +138,19 @@ export const createUISlice = (deps: UISliceDeps): SliceCreator<UISlice> => (set,
         : state.isBacklinksPanelOpen,
     }))
 
-    await persistUIConfig(set, get, deps, get().editorWidth, nextModules)
+    await persistUIConfig(set, get, deps, (config) => ({
+      ...config,
+      editor_width: get().editorWidth,
+      ui_modules: nextModules,
+    }))
   },
   setEditorWidth: async (width) => {
     const current = get()
     set({ editorWidth: width })
-    await persistUIConfig(set, get, deps, width, current.uiModules)
+    await persistUIConfig(set, get, deps, (config) => ({
+      ...config,
+      editor_width: width,
+      ui_modules: current.uiModules,
+    }))
   },
 })

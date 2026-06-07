@@ -60,6 +60,10 @@ function DesktopApp() {
     customCss,
     customizationLoading,
     customizationSaving,
+    traceTheme,
+    traceAccentColor,
+    traceFontFamily,
+    traceLayout,
     editorWidth,
     isBacklinksPanelOpen,
     ioWorking,
@@ -102,6 +106,8 @@ function DesktopApp() {
     hasPendingChanges,
     toggleSidebar,
     togglePropertiesPanel,
+    updateTraceAppearance,
+    updateTraceLayout,
     updateUIModule,
     setEditorWidth,
     unpinNote,
@@ -387,6 +393,10 @@ function DesktopApp() {
         selectedNote={selectedNote}
         traceConfigJson={traceConfigJson}
         traceDir={traceDir}
+        traceTheme={traceTheme}
+        traceAccentColor={traceAccentColor}
+        traceFontFamily={traceFontFamily}
+        traceLayout={traceLayout}
         uiModules={uiModules}
         viewMode={viewMode}
         onContentChange={handleContentChange}
@@ -407,6 +417,8 @@ function DesktopApp() {
         onSetActiveView={setActiveView}
         onSetEditorWidth={(width) => void setEditorWidth(width)}
         onTitleChange={queueNoteTitleSave}
+        onUpdateTraceAppearance={(patch) => void updateTraceAppearance(patch)}
+        onUpdateTraceLayout={(layout) => void updateTraceLayout(layout)}
         onToggleModule={(module, enabled) => void updateUIModule(module, enabled)}
         onTogglePropertiesPanel={togglePropertiesPanel}
         onUnpinNote={unpinNote}

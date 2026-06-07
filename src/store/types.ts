@@ -1,7 +1,13 @@
 import type { Block } from '@blocknote/core'
 import type { StateCreator } from 'zustand'
 import type { GraphComputeMode, NoteGraphData } from '../features/notes-graph/graph'
-import type { ImportSummary, MarkdownDbSnapshot, NoteSearchResult, TraceUIModules } from '../lib/db'
+import type {
+  ImportSummary,
+  MarkdownDbSnapshot,
+  NoteSearchResult,
+  TraceLayoutConfig,
+  TraceUIModules,
+} from '../lib/db'
 import type { Note } from '../types/note'
 import type { AppNode, TreeNode } from '../types/workspace'
 
@@ -112,6 +118,10 @@ export interface SharedSlice {
 }
 
 export interface UISlice {
+  traceTheme: 'dark' | 'light'
+  traceAccentColor: string
+  traceFontFamily: string
+  traceLayout: TraceLayoutConfig
   editorWidth: 'full' | 'centered'
   isSidebarOpen: boolean
   isPropertiesPanelOpen: boolean
@@ -124,6 +134,12 @@ export interface UISlice {
   toggleBacklinksPanel: () => void
   openConnectModal: () => void
   closeConnectModal: () => void
+  updateTraceAppearance: (patch: Partial<{
+    theme: 'dark' | 'light'
+    accent_color: string
+    font_family: string
+  }>) => Promise<void>
+  updateTraceLayout: (layout: TraceLayoutConfig) => Promise<void>
   updateUIModule: (module: keyof TraceUIModules, value: boolean) => Promise<void>
   setEditorWidth: (width: 'full' | 'centered') => Promise<void>
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NoteGraphData } from '../features/notes-graph/graph'
 import { previewFromContent } from '../features/notes-editor/contentMetrics'
 import { clearAccessToken, setAccessToken } from '../lib/auth'
-import type { NoteBacklink, TraceUIModules } from '../lib/db'
+import { parseTraceConfig, type NoteBacklink, type TraceUIModules } from '../lib/db'
 import { apiJson, readJson, refreshAccessToken } from '../lib/http'
 import { withTree } from '../lib/workspace/nodeTree'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../store/types'
@@ -35,6 +35,7 @@ interface FormState {
 }
 
 const DEFAULT_TRACE_CONFIG_JSON = '{}'
+const DEFAULT_TRACE_CONFIG = parseTraceConfig(DEFAULT_TRACE_CONFIG_JSON)
 const EMPTY_GRAPH: NoteGraphData = { nodes: [], links: [] }
 const DEFAULT_UI_MODULES: TraceUIModules = {
   show_breadcrumbs: true,
@@ -498,6 +499,10 @@ export function WebApp() {
         selectedNote={selectedNote}
         traceConfigJson={DEFAULT_TRACE_CONFIG_JSON}
         traceDir={null}
+        traceTheme={DEFAULT_TRACE_CONFIG.theme}
+        traceAccentColor={DEFAULT_TRACE_CONFIG.accent_color}
+        traceFontFamily={DEFAULT_TRACE_CONFIG.font_family}
+        traceLayout={DEFAULT_TRACE_CONFIG.layout}
         uiModules={DEFAULT_UI_MODULES}
         viewMode={viewMode}
         onContentChange={handleContentChange}
@@ -520,6 +525,8 @@ export function WebApp() {
           setViewMode(nextView)
         }}
         onSetEditorWidth={() => setMessage('El ancho del editor web se configurara en settings self-host.')}
+        onUpdateTraceAppearance={() => setMessage('La apariencia web se configurara en settings self-host.')}
+        onUpdateTraceLayout={() => setMessage('El layout web se configurara en settings self-host.')}
         onTitleChange={handleTitleChange}
         onToggleModule={() => setMessage('Los modulos UI web se configuraran en settings self-host.')}
         onTogglePropertiesPanel={() => setPropertiesPanelOpen((open) => !open)}

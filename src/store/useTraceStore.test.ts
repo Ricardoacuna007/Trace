@@ -17,6 +17,18 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
     editor_width: 'centered',
     vim_mode: false,
     pinned_note_ids: [],
+    layout: {
+      sidebar_position: 'left',
+      right_panel: 'visible',
+      visible_elements: {
+        breadcrumb: true,
+        metabar: true,
+        word_count: true,
+        modified_at: true,
+        titlebar: true,
+        traffic_lights: true,
+      },
+    },
     ui_modules: {
       show_breadcrumbs: true,
       show_backlinks: true,
@@ -33,6 +45,14 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       ui_modules: {
         ...fallback.ui_modules,
         ...(parsed.ui_modules ?? {}),
+      },
+      layout: {
+        ...fallback.layout,
+        ...(parsed.layout ?? {}),
+        visible_elements: {
+          ...fallback.layout.visible_elements,
+          ...(parsed.layout?.visible_elements ?? {}),
+        },
       },
       pinned_note_ids: Array.isArray(parsed.pinned_note_ids) ? parsed.pinned_note_ids : [],
     }

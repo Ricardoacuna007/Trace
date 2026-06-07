@@ -1,5 +1,5 @@
 ﻿import type { Block } from '@blocknote/core'
-import type { NoteBacklink } from '../../lib/db'
+import type { NoteBacklink, TraceRightPanelMode } from '../../lib/db'
 import type { NoteRelation } from '../../store/types'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
@@ -13,8 +13,11 @@ interface EditorLayoutProps {
   noteRelations: NoteRelation[]
   recentConnectionIds: string[]
   editorWidth: 'full' | 'centered'
+  rightPanelMode: TraceRightPanelMode
   showBacklinks: boolean
+  showModifiedAt: boolean
   showProperties: boolean
+  showWordCount: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
   onOpenWikiLink: (title: string) => void
   onSelectNode: (id: string) => void
@@ -28,8 +31,11 @@ export function EditorLayout({
   noteRelations,
   recentConnectionIds,
   editorWidth,
+  rightPanelMode,
   showBacklinks,
+  showModifiedAt,
   showProperties,
+  showWordCount,
   onContentChange,
   onOpenWikiLink,
   onSelectNode,
@@ -40,20 +46,24 @@ export function EditorLayout({
       <EditorWrapper
         note={note}
         editorWidth={editorWidth}
+        showModifiedAt={showModifiedAt}
+        showWordCount={showWordCount}
         onContentChange={onContentChange}
         onOpenWikiLink={onOpenWikiLink}
         onTitleChange={onTitleChange}
       />
-      <RightPanel
-        backlinks={backlinks}
-        nodes={nodes}
-        note={note}
-        noteRelations={noteRelations}
-        recentConnectionIds={recentConnectionIds}
-        showBacklinks={showBacklinks}
-        showProperties={showProperties}
-        onSelectNode={onSelectNode}
-      />
+      {rightPanelMode === 'visible' ? (
+        <RightPanel
+          backlinks={backlinks}
+          nodes={nodes}
+          note={note}
+          noteRelations={noteRelations}
+          recentConnectionIds={recentConnectionIds}
+          showBacklinks={showBacklinks}
+          showProperties={showProperties}
+          onSelectNode={onSelectNode}
+        />
+      ) : null}
     </div>
   )
 }

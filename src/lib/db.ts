@@ -7,7 +7,11 @@ export type {
   NoteBacklink,
   NoteSearchResult,
   TraceConfig,
+  TraceLayoutConfig,
+  TraceRightPanelMode,
+  TraceSidebarPosition,
   TraceUIModules,
+  TraceVisibleElements,
   VaultCustomization,
 } from './database/types'
 

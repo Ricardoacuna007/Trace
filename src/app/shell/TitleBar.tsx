@@ -10,11 +10,12 @@ const tabs: Array<{ view: AppViewMode; label: string; icon: typeof Pencil }> = [
 
 interface TitleBarProps {
   activeView: AppViewMode
+  showTrafficLights: boolean
   workspaceTitle: string
   onSetActiveView: (view: AppViewMode) => void
 }
 
-export function TitleBar({ activeView, workspaceTitle, onSetActiveView }: TitleBarProps) {
+export function TitleBar({ activeView, showTrafficLights, workspaceTitle, onSetActiveView }: TitleBarProps) {
   const env = useEnv()
 
   return (
@@ -22,7 +23,7 @@ export function TitleBar({ activeView, workspaceTitle, onSetActiveView }: TitleB
       data-tauri-drag-region
       className="flex h-[var(--titlebar-h)] shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg2)] px-3"
     >
-      {env.isTauri ? (
+      {env.isTauri && showTrafficLights ? (
         <div data-tauri-drag-region className="flex items-center gap-1.5">
           <span className="h-[11px] w-[11px] rounded-full bg-[var(--red)]/85" />
           <span className="h-[11px] w-[11px] rounded-full bg-[var(--amber)]/85" />

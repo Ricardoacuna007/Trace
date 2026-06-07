@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { TraceUIModules } from '../../lib/db'
+import type { TraceLayoutConfig, TraceUIModules } from '../../lib/db'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
 import { CustomizationEditors } from './components/CustomizationEditors'
@@ -19,6 +19,10 @@ interface SettingsViewProps {
   ioMessage: string | null
   nodes: AppNode[]
   selectedNote: Note | null
+  traceTheme: 'dark' | 'light'
+  traceAccentColor: string
+  traceFontFamily: string
+  traceLayout: TraceLayoutConfig
   editorWidth: 'full' | 'centered'
   uiModules: TraceUIModules
   onReloadCustomization: () => void
@@ -29,6 +33,12 @@ interface SettingsViewProps {
   onPrintCurrentNote: () => void
   onReloadWorkspace: () => Promise<void>
   onSetEditorWidth: (width: 'full' | 'centered') => void
+  onUpdateTraceAppearance: (patch: Partial<{
+    theme: 'dark' | 'light'
+    accent_color: string
+    font_family: string
+  }>) => void
+  onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
 }
 
@@ -43,6 +53,10 @@ export function SettingsView({
   ioMessage,
   nodes,
   selectedNote,
+  traceTheme,
+  traceAccentColor,
+  traceFontFamily,
+  traceLayout,
   editorWidth,
   uiModules,
   onReloadCustomization,
@@ -53,6 +67,8 @@ export function SettingsView({
   onPrintCurrentNote,
   onReloadWorkspace,
   onSetEditorWidth,
+  onUpdateTraceAppearance,
+  onUpdateTraceLayout,
   onToggleModule,
 }: SettingsViewProps) {
   const [configDraftState, setConfigDraftState] = useState(() => ({
@@ -98,8 +114,14 @@ export function SettingsView({
 
         <UIModulesSection
           editorWidth={editorWidth}
+          traceTheme={traceTheme}
+          traceAccentColor={traceAccentColor}
+          traceFontFamily={traceFontFamily}
+          traceLayout={traceLayout}
           uiModules={uiModules}
           onSetEditorWidth={onSetEditorWidth}
+          onUpdateTraceAppearance={onUpdateTraceAppearance}
+          onUpdateTraceLayout={onUpdateTraceLayout}
           onToggleModule={onToggleModule}
         />
 

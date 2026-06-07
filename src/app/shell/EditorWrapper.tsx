@@ -7,6 +7,8 @@ import type { Note } from '../../types/note'
 interface EditorWrapperProps {
   note: Note
   editorWidth: 'full' | 'centered'
+  showModifiedAt: boolean
+  showWordCount: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
   onOpenWikiLink: (title: string) => void
   onTitleChange: (noteId: string, title: string) => void
@@ -15,6 +17,8 @@ interface EditorWrapperProps {
 export function EditorWrapper({
   note,
   editorWidth,
+  showModifiedAt,
+  showWordCount,
   onContentChange,
   onOpenWikiLink,
   onTitleChange,
@@ -22,6 +26,11 @@ export function EditorWrapper({
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const words = countWords(note.content)
   const minutes = readingMinutes(words)
+  const metaItems = [
+    showModifiedAt ? `modificado ${formatRelativeTime(note.updatedAt)}` : null,
+    showWordCount ? `${words} palabras` : null,
+    showWordCount ? `${minutes} min lectura` : null,
+  ].filter((item): item is string => item !== null)
   const contentWidthClassName = editorWidth === 'full'
     ? 'w-full max-w-none'
     : 'mx-auto w-full max-w-[820px]'
@@ -58,9 +67,13 @@ export function EditorWrapper({
           className="mb-1 max-h-24 min-h-[32px] w-full resize-none break-words bg-transparent text-[26px] font-light leading-tight tracking-normal text-[var(--t1)] outline-none placeholder:text-[var(--t3)]"
           placeholder="Untitled"
         />
-        <div className="mb-8 font-mono text-[11px] text-[var(--t3)]">
-          modificado {formatRelativeTime(note.updatedAt)} · {words} palabras · {minutes} min lectura
-        </div>
+        {metaItems.length > 0 ? (
+          <div className="mb-8 font-mono text-[11px] text-[var(--t3)]">
+            {metaItems.join(' · ')}
+          </div>
+        ) : (
+          <div className="mb-5" />
+        )}
         <NoteEditorBody note={note} onContentChange={onContentChange} onOpenWikiLink={onOpenWikiLink} />
       </div>
     </section>

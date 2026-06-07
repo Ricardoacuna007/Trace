@@ -9,6 +9,18 @@ export const DEFAULT_TRACE_CONFIG_JSON = JSON.stringify(
     editor_width: 'centered',
     vim_mode: false,
     pinned_note_ids: [],
+    layout: {
+      sidebar_position: 'left',
+      right_panel: 'visible',
+      visible_elements: {
+        breadcrumb: true,
+        metabar: true,
+        word_count: true,
+        modified_at: true,
+        titlebar: true,
+        traffic_lights: true,
+      },
+    },
     ui_modules: {
       show_breadcrumbs: true,
       show_backlinks: true,
