@@ -136,9 +136,9 @@ export function NoteHeader({
     <header className="relative flex h-[var(--header-h)] shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--bg)] px-4">
       <div className="flex min-w-0 items-center gap-1 text-[12px] text-[var(--t2)]">
         {breadcrumbs.map((item, index) => (
-          <div key={item.id} className="flex min-w-0 items-center gap-1">
+          <div key={item.id} className="flex min-w-0 items-center gap-1" title={item.title}>
             {index === 0 ? <Folder className="h-3.5 w-3.5 shrink-0 text-[var(--amber)]" /> : null}
-            <span className={index === breadcrumbs.length - 1 ? 'truncate text-[var(--t1)]' : 'truncate'}>
+            <span className={index === breadcrumbs.length - 1 ? 'max-w-[44vw] truncate text-[var(--t1)]' : 'max-w-[18vw] truncate'}>
               {item.title}
             </span>
             {index < breadcrumbs.length - 1 ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--t3)]" /> : null}

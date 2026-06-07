@@ -64,7 +64,7 @@ function BacklinkRow({
       <div className="flex gap-2">
         <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--t3)]" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-medium text-[var(--t1)]">{item.title}</p>
+          <p className="truncate text-[12px] font-medium text-[var(--t1)]" title={item.title}>{item.title}</p>
           <p className="line-clamp-2 text-[11px] leading-snug text-[var(--t2)]">"{item.preview}"</p>
           {bidirectional ? (
             <span className="mt-1 inline-flex rounded-full border border-[rgba(74,222,128,0.25)] bg-[rgba(74,222,128,0.08)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--green)]">
@@ -166,6 +166,7 @@ export function RightPanel({
                   elements.item(index)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                 }}
                 className="block w-full truncate rounded-[var(--radius-sm)] px-1.5 py-1 text-left text-[11px] text-[var(--t2)] hover:bg-[var(--bg3)] hover:text-[var(--t1)]"
+                title={heading.text}
                 style={{ paddingLeft: `${4 + (heading.level - 1) * 12}px` }}
               >
                 {heading.text}

@@ -24,7 +24,7 @@ Tipo: bug / UX
 Prioridad: P1
 Version reportada: v0.2.3
 Origen: testers externos
-Estado: en correccion
+Estado: resuelto en v0.2.4
 
 Problema:
 

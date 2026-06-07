@@ -50,7 +50,7 @@ export function WorkspaceView({
         <header className="mb-6 flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="font-mono text-[11px] text-[var(--t3)]">workspace /</p>
-            <h1 className="mt-1 truncate text-[26px] font-light text-[var(--t1)]">
+            <h1 className="mt-1 truncate text-[26px] font-light text-[var(--t1)]" title={workspaceTitle(nodes, activeVaultPath)}>
               {workspaceTitle(nodes, activeVaultPath)}
             </h1>
           </div>
@@ -101,7 +101,9 @@ export function WorkspaceView({
               >
                 <div className="mb-3 flex items-center gap-2">
                   <Icon className={`h-4 w-4 ${isNote ? 'text-[var(--t3)]' : 'text-[var(--amber)]'}`} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--t1)]">{item.title}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm font-medium leading-snug text-[var(--t1)]" title={item.title}>
+                    {item.title}
+                  </span>
                 </div>
                 <p className="mb-2 font-mono text-[10px] uppercase text-[var(--t3)]">
                   {item.type} · {formatRelativeTime(item.updatedAt)}

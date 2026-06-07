@@ -57,6 +57,7 @@ export function TreeNode({
 
         <button
           type="button"
+          title={node.title}
           onClick={() => onSelectNode(node.id)}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
         >

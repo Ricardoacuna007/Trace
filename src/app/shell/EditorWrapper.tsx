@@ -1,7 +1,8 @@
-﻿import type { Block } from '@blocknote/core'
+import type { Block } from '@blocknote/core'
+import { useEffect, useRef } from 'react'
+import { countWords, formatRelativeTime, readingMinutes } from '../../features/notes-editor/contentMetrics'
 import { NoteEditorBody } from '../../features/notes-editor/components/NoteEditorBody'
 import type { Note } from '../../types/note'
-import { countWords, formatRelativeTime, readingMinutes } from '../../features/notes-editor/contentMetrics'
 
 interface EditorWrapperProps {
   note: Note
@@ -18,20 +19,43 @@ export function EditorWrapper({
   onOpenWikiLink,
   onTitleChange,
 }: EditorWrapperProps) {
+  const titleRef = useRef<HTMLTextAreaElement>(null)
   const words = countWords(note.content)
   const minutes = readingMinutes(words)
   const contentWidthClassName = editorWidth === 'full'
     ? 'w-full max-w-none'
     : 'mx-auto w-full max-w-[820px]'
 
+  useEffect(() => {
+    const titleElement = titleRef.current
+    if (!titleElement) {
+      return
+    }
+
+    titleElement.style.height = '0px'
+    const maxHeight = 96
+    const nextHeight = Math.min(titleElement.scrollHeight, maxHeight)
+    titleElement.style.height = `${nextHeight}px`
+    titleElement.style.overflowY = titleElement.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [note.title, editorWidth])
+
   return (
     <section className="trace-scrollbar min-h-0 flex-1 overflow-y-auto bg-[var(--bg)] px-0 py-3 md:px-12">
       <div className={`flex min-h-full flex-col ${contentWidthClassName}`}>
-        <input
+        <textarea
+          ref={titleRef}
           value={note.title}
-          onChange={(event) => onTitleChange(note.id, event.target.value)}
-          aria-label="Título de nota"
-          className="mb-1 w-full bg-transparent text-[26px] font-light leading-tight tracking-normal text-[var(--t1)] outline-none placeholder:text-[var(--t3)]"
+          onChange={(event) => onTitleChange(note.id, event.target.value.replace(/\s*\r?\n\s*/g, ' '))}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+            }
+          }}
+          aria-label="Titulo de nota"
+          title={note.title}
+          rows={1}
+          spellCheck
+          className="mb-1 max-h-24 min-h-[32px] w-full resize-none break-words bg-transparent text-[26px] font-light leading-tight tracking-normal text-[var(--t1)] outline-none placeholder:text-[var(--t3)]"
           placeholder="Untitled"
         />
         <div className="mb-8 font-mono text-[11px] text-[var(--t3)]">
