@@ -1,5 +1,6 @@
 import { Check, FileText, Network, Sigma, Sparkles, X } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
+import { CodeRunnerSection } from '../../features/code-runner/CodeRunnerSection'
 import { suggestConnections, type ConnectionSuggestion } from '../../features/notes-connections/suggestions'
 import {
   buildBacklinkItems,
@@ -295,6 +296,10 @@ export function RightPanel({
           </div>
         </Section>
       ) : null}
+
+      <Section title="Codigo ejecutable">
+        <CodeRunnerSection content={note.content} />
+      </Section>
 
       <Section title="Grafo local">
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] p-1">
