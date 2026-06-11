@@ -168,12 +168,122 @@ export function extractPlainTextFromContent(content: string): string {
     .join('\n')
 }
 
+function paragraphBlock(content: string): PartialBlock {
+  return {
+    type: 'paragraph',
+    content,
+  }
+}
+
+function headingBlock(content: string): PartialBlock {
+  return {
+    type: 'heading',
+    props: { level: 2 },
+    content,
+  }
+}
+
+function codeBlock(content: string, language?: string): PartialBlock {
+  const block: PartialBlock = {
+    type: 'codeBlock',
+    content,
+  }
+  if (language) {
+    block.props = { language }
+  }
+  return block
+}
+
+function isListLine(value: string): boolean {
+  return /^[-*]\s+/.test(value) || /^\d+\.\s+/.test(value)
+}
+
+function stripCodeIndent(value: string): string {
+  if (value.startsWith('\t')) {
+    return value.slice(1)
+  }
+  if (value.startsWith('    ')) {
+    return value.slice(4)
+  }
+  return value
+}
+
 export function blocksFromPlainText(text: string): Block[] {
   const lines = text.replace(/\r/g, '').split('\n')
   const nonEmpty = lines.length > 0 ? lines : ['']
+  const blocks: PartialBlock[] = []
+  let index = 0
 
-  return nonEmpty.map((line) => ({
-    type: 'paragraph',
-    content: line,
-  })) as unknown as Block[]
+  while (index < nonEmpty.length) {
+    const line = nonEmpty[index] ?? ''
+    const trimmed = line.trim()
+    const nextLine = nonEmpty[index + 1]
+
+    const fencedCode = trimmed.match(/^```([a-z0-9_-]+)?$/i)
+    if (fencedCode) {
+      const codeLines: string[] = []
+      index += 1
+
+      while (index < nonEmpty.length && (nonEmpty[index] ?? '').trim() !== '```') {
+        codeLines.push(nonEmpty[index] ?? '')
+        index += 1
+      }
+
+      if (index < nonEmpty.length) {
+        index += 1
+      }
+
+      blocks.push(codeBlock(codeLines.join('\n'), fencedCode[1]))
+      continue
+    }
+
+    if (/^( {4}|\t)/.test(line)) {
+      const codeLines: string[] = []
+
+      while (index < nonEmpty.length && (/^( {4}|\t)/.test(nonEmpty[index] ?? '') || (nonEmpty[index] ?? '').trim() === '')) {
+        codeLines.push(stripCodeIndent(nonEmpty[index] ?? ''))
+        index += 1
+      }
+
+      blocks.push(codeBlock(codeLines.join('\n')))
+      continue
+    }
+
+    if (
+      trimmed.length > 0 &&
+      trimmed.length < 60 &&
+      nextLine !== undefined &&
+      nextLine.trim() === '' &&
+      !isListLine(trimmed)
+    ) {
+      blocks.push(headingBlock(trimmed))
+      index += 2
+      continue
+    }
+
+    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/)
+    if (bulletMatch) {
+      blocks.push({
+        type: 'bulletListItem',
+        content: bulletMatch[1],
+      })
+      index += 1
+      continue
+    }
+
+    const numberedMatch = trimmed.match(/^\d+\.\s+(.+)$/)
+    if (numberedMatch) {
+      blocks.push({
+        type: 'numberedListItem',
+        content: numberedMatch[1],
+      })
+      index += 1
+      continue
+    }
+
+    blocks.push(paragraphBlock(line))
+    index += 1
+  }
+
+  return blocks as unknown as Block[]
 }

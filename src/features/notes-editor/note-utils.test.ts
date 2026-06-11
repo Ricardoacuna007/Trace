@@ -56,4 +56,25 @@ describe('note-utils', () => {
 
     expect(extractPlainTextFromContent(stored)).toBe('Line one\nLine two')
   })
+
+  it('infers lightweight structure from plain text', () => {
+    const blocks = blocksFromPlainText([
+      'Idea principal',
+      '',
+      '- Primer punto',
+      '2. Segundo punto',
+      '```python',
+      'print("trace")',
+      '```',
+      '    const value = 1',
+    ].join('\n'))
+
+    expect(blocks).toEqual([
+      expect.objectContaining({ type: 'heading', props: { level: 2 }, content: 'Idea principal' }),
+      expect.objectContaining({ type: 'bulletListItem', content: 'Primer punto' }),
+      expect.objectContaining({ type: 'numberedListItem', content: 'Segundo punto' }),
+      expect.objectContaining({ type: 'codeBlock', props: { language: 'python' }, content: 'print("trace")' }),
+      expect.objectContaining({ type: 'codeBlock', content: 'const value = 1' }),
+    ])
+  })
 })
