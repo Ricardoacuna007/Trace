@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as d3 from 'd3'
+import { ClusterPanel } from '../../features/notes-graph/ClusterPanel'
+import { buildGraphClusters, type GraphCluster } from '../../features/notes-graph/clusters'
 import type { NoteGraphData, NoteGraphNode } from '../../features/notes-graph/graph'
 import { buildGraphNodeVisuals, type GraphNodeVisual } from '../../features/notes-graph/visuals'
 import type { AppNode } from '../../types/workspace'
@@ -37,7 +39,22 @@ function cssVar(name: string, fallback: string): string {
   return value || fallback
 }
 
-function fillForVisual(visual: GraphNodeVisual | undefined, accentGlow: string): string {
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '')
+  if (!/^[a-f0-9]{6}$/i.test(clean)) {
+    return hex
+  }
+  const red = Number.parseInt(clean.slice(0, 2), 16)
+  const green = Number.parseInt(clean.slice(2, 4), 16)
+  const blue = Number.parseInt(clean.slice(4, 6), 16)
+  return `rgba(${red},${green},${blue},${alpha})`
+}
+
+function fillForVisual(
+  visual: GraphNodeVisual | undefined,
+  accentGlow: string,
+  clusterColor: string | undefined,
+): string {
   if (visual?.kind === 'active') {
     return accentGlow
   }
@@ -47,12 +64,16 @@ function fillForVisual(visual: GraphNodeVisual | undefined, accentGlow: string):
   if (visual?.kind === 'bridge') {
     return 'rgba(245,158,11,0.11)'
   }
+  if (clusterColor) {
+    return hexToRgba(clusterColor, 0.11)
+  }
   return 'rgba(255,255,255,0.04)'
 }
 
 function strokeForVisual(
   visual: GraphNodeVisual | undefined,
   colors: { accent: string; amber: string; border2: string; red: string },
+  clusterColor: string | undefined,
 ): string {
   if (visual?.kind === 'active') {
     return colors.accent
@@ -65,6 +86,9 @@ function strokeForVisual(
   }
   if (visual?.isRecent) {
     return colors.accent
+  }
+  if (clusterColor) {
+    return clusterColor
   }
   return colors.border2
 }
@@ -85,9 +109,45 @@ function labelColorForVisual(
   return colors.t3
 }
 
+function clusterHullPath(cluster: GraphCluster, nodeByGraphId: Map<string, GraphNodeDatum>): string | null {
+  const points = cluster.graphNodeIds
+    .map((graphNodeId) => nodeByGraphId.get(graphNodeId))
+    .filter((node): node is GraphNodeDatum => typeof node?.x === 'number' && typeof node.y === 'number')
+    .map((node) => [node.x ?? 0, node.y ?? 0] satisfies [number, number])
+
+  if (points.length < 3) {
+    return null
+  }
+
+  const hull = d3.polygonHull(points)
+  if (!hull) {
+    return null
+  }
+
+  return `M${hull.map((point) => point.join(',')).join('L')}Z`
+}
+
 export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }: GraphViewProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null)
+  const clusters = useMemo(() => buildGraphClusters(graph, workspaceNodes), [graph, workspaceNodes])
+  const selectedCluster = clusters.find((cluster) => cluster.id === selectedClusterId) ?? null
+  const clusterColorByNoteId = useMemo(() => {
+    const colorByNoteId = new Map<string, string>()
+    for (const cluster of clusters) {
+      for (const noteId of cluster.noteIds) {
+        colorByNoteId.set(noteId, cluster.color)
+      }
+    }
+    return colorByNoteId
+  }, [clusters])
+
+  useEffect(() => {
+    if (selectedClusterId && !clusters.some((cluster) => cluster.id === selectedClusterId)) {
+      setSelectedClusterId(null)
+    }
+  }, [clusters, selectedClusterId])
 
   useEffect(() => {
     const wrapper = wrapperRef.current
@@ -156,6 +216,22 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       .filter((link) => nodeIds.has(link.source) && nodeIds.has(link.target))
       .map((link) => ({ ...link }))
 
+    const clusterPath = canvas
+      .append('g')
+      .attr('pointer-events', 'all')
+      .selectAll('path')
+      .data(clusters)
+      .join('path')
+      .attr('fill', (cluster) => hexToRgba(cluster.color, 0.06))
+      .attr('stroke', (cluster) => hexToRgba(cluster.color, 0.38))
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '5 6')
+      .style('cursor', 'pointer')
+      .on('click', (event, cluster) => {
+        event.stopPropagation()
+        setSelectedClusterId(cluster.id)
+      })
+
     const link = canvas
       .append('g')
       .attr('stroke-linecap', 'round')
@@ -180,8 +256,12 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       .data(nodes)
       .join('circle')
       .attr('r', (datum) => radiusFromDegree(datum.degree))
-      .attr('fill', (datum) => fillForVisual(visuals.get(datum.noteId), accentGlow))
-      .attr('stroke', (datum) => strokeForVisual(visuals.get(datum.noteId), { accent, amber, border2, red }))
+      .attr('fill', (datum) => fillForVisual(visuals.get(datum.noteId), accentGlow, clusterColorByNoteId.get(datum.noteId)))
+      .attr('stroke', (datum) => strokeForVisual(
+        visuals.get(datum.noteId),
+        { accent, amber, border2, red },
+        clusterColorByNoteId.get(datum.noteId),
+      ))
       .attr('stroke-width', (datum) => {
         const visual = visuals.get(datum.noteId)
         return visual?.kind === 'active' || visual?.isRecent ? 1.8 : 1
@@ -217,6 +297,9 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collide', d3.forceCollide((datum) => radiusFromDegree((datum as GraphNodeDatum).degree) + 12))
       .on('tick', () => {
+        const nodeByGraphId = new Map(nodes.map((datum) => [datum.id, datum]))
+        clusterPath.attr('d', (cluster) => clusterHullPath(cluster, nodeByGraphId))
+
         link
           .attr('x1', (datum) => (datum.source as GraphNodeDatum).x ?? 0)
           .attr('y1', (datum) => (datum.source as GraphNodeDatum).y ?? 0)
@@ -256,12 +339,40 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       svg.on('dblclick', null)
       tooltip.remove()
     }
-  }, [graph, onOpenNote, selectedNoteId, workspaceNodes])
+  }, [clusterColorByNoteId, clusters, graph, onOpenNote, selectedNoteId, workspaceNodes])
 
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col bg-[var(--bg)] p-4">
       <div ref={wrapperRef} className="relative min-h-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg2)]">
         <svg ref={svgRef} className="h-full w-full" />
+        {clusters.length > 0 ? (
+          <div className="absolute left-3 top-3 z-10 flex max-w-[360px] flex-wrap gap-1.5">
+            {clusters.slice(0, 6).map((cluster) => (
+              <button
+                key={cluster.id}
+                type="button"
+                aria-label={`Abrir cluster ${cluster.label}`}
+                className="flex max-w-[150px] items-center gap-1.5 rounded-[var(--radius-md)] border bg-[var(--bg3)] px-2 py-1 font-mono text-[10px] text-[var(--t2)] shadow-xl transition-all hover:bg-[var(--bg4)] hover:text-[var(--t1)]"
+                style={{ borderColor: hexToRgba(cluster.color, 0.38) }}
+                onClick={() => setSelectedClusterId(cluster.id)}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cluster.color }} />
+                <span className="truncate">{cluster.label}</span>
+                <span className="text-[var(--t3)]">{cluster.notes.length}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {selectedCluster ? (
+          <ClusterPanel
+            cluster={selectedCluster}
+            onClose={() => setSelectedClusterId(null)}
+            onOpenNote={(noteId) => {
+              setSelectedClusterId(null)
+              onOpenNote(noteId)
+            }}
+          />
+        ) : null}
       </div>
       <p className="mt-2 font-mono text-[11px] text-[var(--t3)]">
         {graph.nodes.length} notas | {graph.links.length} conexiones | huerfanas y puentes resaltados
