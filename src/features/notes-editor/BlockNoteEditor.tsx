@@ -1,8 +1,9 @@
 import { BlockNoteView, type Theme } from '@blocknote/mantine'
 import '@blocknote/mantine/style.css'
 import { useCreateBlockNote } from '@blocknote/react'
-import { useCallback, useEffect, useMemo, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react'
 import type { Block } from '@blocknote/core'
+import { useInlineCodeRunner } from '../code-runner/useInlineCodeRunner'
 import { parseBlocks } from './note-utils'
 import { getWikiLinkAtTextOffset } from './wikiLinks'
 import type { Note } from '../../types/note'
@@ -129,6 +130,7 @@ function getTextPositionFromPoint(clientX: number, clientY: number): { node: Tex
 }
 
 export function BlockNoteEditor({ note, onChange, onOpenWikiLink }: BlockNoteEditorProps) {
+  const editorRootRef = useRef<HTMLDivElement | null>(null)
   const initialContent = useMemo(() => parseBlocks(note.content), [note.content])
 
   const editor = useCreateBlockNote(
@@ -137,6 +139,7 @@ export function BlockNoteEditor({ note, onChange, onOpenWikiLink }: BlockNoteEdi
     },
     [note.id],
   )
+  useInlineCodeRunner(editor, editorRootRef, note.id)
 
   const handleEditorChange = useCallback(() => {
     onChange(note.id, [...editor.document])
@@ -168,7 +171,7 @@ export function BlockNoteEditor({ note, onChange, onOpenWikiLink }: BlockNoteEdi
   }, [note.id])
 
   return (
-    <div onClick={handleEditorClick}>
+    <div ref={editorRootRef} onClick={handleEditorClick}>
       <BlockNoteView editor={editor} onChange={handleEditorChange} theme={traceBlockNoteTheme} />
     </div>
   )

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { extractCodeBlocks } from './codeBlocks'
+import type { Block } from '@blocknote/core'
+import { extractCodeBlocks, snippetFromBlock } from './codeBlocks'
 
 describe('extractCodeBlocks', () => {
   it('extracts executable snippets from block content', () => {
@@ -46,5 +47,21 @@ describe('extractCodeBlocks', () => {
 
   it('returns an empty list for invalid content', () => {
     expect(extractCodeBlocks('not json')).toEqual([])
+  })
+
+  it('creates a snippet from a BlockNote code block', () => {
+    const block = {
+      id: 'runtime-block',
+      type: 'codeBlock',
+      props: { language: 'javascript' },
+      content: [{ type: 'text', text: 'console.log("trace")' }],
+    } as unknown as Block
+
+    expect(snippetFromBlock(block)).toEqual({
+      id: 'runtime-block',
+      language: 'javascript',
+      code: 'console.log("trace")',
+      label: 'javascript #1',
+    })
   })
 })

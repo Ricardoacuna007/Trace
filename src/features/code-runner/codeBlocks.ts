@@ -1,3 +1,5 @@
+import type { Block } from '@blocknote/core'
+
 export interface CodeBlockSnippet {
   id: string
   language: string
@@ -61,6 +63,26 @@ function visitBlocks(blocks: unknown[], snippets: CodeBlockSnippet[]) {
     if (Array.isArray(record.children)) {
       visitBlocks(record.children, snippets)
     }
+  }
+}
+
+export function snippetFromBlock(block: Block, fallbackIndex = 0): CodeBlockSnippet | null {
+  if (block.type !== 'codeBlock') {
+    return null
+  }
+
+  const code = inlineText((block as { content?: unknown }).content)
+  if (!code.trim()) {
+    return null
+  }
+
+  const props = (block as { props?: unknown }).props
+  const language = blockLanguage(props)
+  return {
+    id: block.id,
+    language,
+    code,
+    label: `${language} #${fallbackIndex + 1}`,
   }
 }
 
