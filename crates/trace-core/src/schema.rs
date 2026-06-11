@@ -27,6 +27,13 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
         PRIMARY KEY (source_id, target_id)
       );
 
+      CREATE TABLE IF NOT EXISTS ignored_suggestions (
+        source_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+        target_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+        ignored_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        PRIMARY KEY (source_id, target_id)
+      );
+
       CREATE TABLE IF NOT EXISTS refresh_tokens (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -77,6 +84,8 @@ pub fn ensure_trace_schema(connection: &Connection) -> Result<(), String> {
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type);
       CREATE INDEX IF NOT EXISTS idx_note_relations_source ON note_relations(source_id);
       CREATE INDEX IF NOT EXISTS idx_note_relations_target ON note_relations(target_id);
+      CREATE INDEX IF NOT EXISTS idx_ignored_suggestions_source ON ignored_suggestions(source_id);
+      CREATE INDEX IF NOT EXISTS idx_ignored_suggestions_target ON ignored_suggestions(target_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
       CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
@@ -227,6 +236,7 @@ mod tests {
 
         assert!(table_exists(&connection, "nodes"));
         assert!(table_exists(&connection, "note_relations"));
+        assert!(table_exists(&connection, "ignored_suggestions"));
         assert!(table_exists(&connection, "refresh_tokens"));
         assert!(table_exists(&connection, "audit_log"));
         assert!(table_exists(&connection, "sync_state"));
@@ -234,6 +244,10 @@ mod tests {
         assert!(table_exists(&connection, "backup_history"));
         assert!(index_exists(&connection, "idx_nodes_parent_position"));
         assert!(index_exists(&connection, "idx_nodes_inbox_updated"));
+        assert!(index_exists(
+            &connection,
+            "idx_ignored_suggestions_source"
+        ));
         assert!(index_exists(&connection, "idx_refresh_tokens_expires_at"));
         assert!(index_exists(&connection, "idx_audit_log_created_at"));
         assert!(index_exists(&connection, "idx_sync_log_status"));

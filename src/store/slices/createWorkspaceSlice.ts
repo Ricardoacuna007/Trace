@@ -4,6 +4,8 @@ import {
   createInboxNote as createInboxNoteInDb,
   createNode,
   deleteNode,
+  ignoreConnectionSuggestion as ignoreConnectionSuggestionInDb,
+  listIgnoredSuggestions,
   listNodes,
   listNoteRelations,
   moveNode as moveNodeInDb,
@@ -68,6 +70,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
   nodeTree: TreeNode[]
   noteRelations: NoteRelation[]
   connections: NoteRelation[]
+  ignoredSuggestionPairs: string[]
   selectedNodeId: string | null
   activeNoteId: string | null
   activeView: AppViewMode
@@ -87,6 +90,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
   addRelationByIds: (sourceId: string, targetId: string) => Promise<void>
   removeRelationByIds: (sourceId: string, targetId: string) => Promise<void>
   connectNotes: (sourceId: string, targetIds: string[]) => Promise<void>
+  ignoreConnectionSuggestion: (sourceId: string, targetId: string) => Promise<void>
   getBacklinks: (noteId: string) => NotesState['notes']
   pinNote: (noteId: string) => void
   unpinNote: (noteId: string) => void
@@ -101,6 +105,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
   nodeTree: [],
   noteRelations: [],
   connections: [],
+  ignoredSuggestionPairs: [],
   selectedNodeId: null,
   activeNoteId: null,
   activeView: 'workspace',
@@ -266,6 +271,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
     try {
       const nodes = await listNodes()
       const relationRows = await listNoteRelations()
+      const ignoredRows = await listIgnoredSuggestions()
       const noteRelations = deps.normalizeRelations(relationRows)
       const treeState = deps.withTree(nodes)
       set({
@@ -273,6 +279,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
         notes: notesFromNodes(treeState.nodes),
         noteRelations,
         connections: noteRelations,
+        ignoredSuggestionPairs: ignoredRows.map((row) => `${row.source_id}->${row.target_id}`),
       })
       await get().refreshGraph(treeState.nodes, noteRelations)
     } catch (error) {
@@ -440,11 +447,40 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
         noteRelations: mergedRelations,
         connections: mergedRelations,
         recentConnectionIds: normalizedTargets,
+        ignoredSuggestionPairs: get().ignoredSuggestionPairs.filter((pair) => (
+          !normalizedTargets.some((targetId) => (
+            pair === `${sourceId}->${targetId}` || pair === `${targetId}->${sourceId}`
+          ))
+        )),
         error: null,
       })
       await get().refreshGraph(undefined, mergedRelations)
     } catch (error) {
       set({ error: `No se pudieron conectar las notas: ${deps.normalizeError(error)}` })
+    }
+  },
+  ignoreConnectionSuggestion: async (sourceId, targetId) => {
+    const normalizedSource = sourceId.trim()
+    const normalizedTarget = targetId.trim()
+    if (!normalizedSource || !normalizedTarget || normalizedSource === normalizedTarget) {
+      return
+    }
+
+    const forwardKey = `${normalizedSource}->${normalizedTarget}`
+    const reverseKey = `${normalizedTarget}->${normalizedSource}`
+    if (get().ignoredSuggestionPairs.includes(forwardKey)) {
+      return
+    }
+
+    try {
+      await ignoreConnectionSuggestionInDb(normalizedSource, normalizedTarget)
+      await ignoreConnectionSuggestionInDb(normalizedTarget, normalizedSource)
+      set({
+        ignoredSuggestionPairs: [...get().ignoredSuggestionPairs, forwardKey, reverseKey],
+        error: null,
+      })
+    } catch (error) {
+      set({ error: `No se pudo ignorar la sugerencia: ${deps.normalizeError(error)}` })
     }
   },
   getBacklinks: (noteId) => {

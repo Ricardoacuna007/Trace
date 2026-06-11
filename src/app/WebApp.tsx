@@ -481,6 +481,7 @@ export function WebApp() {
         editorWidth="centered"
         graphData={graphData}
         hasPendingChanges={saveStatus === 'saving'}
+        ignoredSuggestionPairs={[]}
         isBacklinksPanelOpen
         ioMessage={message}
         ioWorking={busy}
@@ -507,6 +508,7 @@ export function WebApp() {
         viewMode={viewMode}
         onContentChange={handleContentChange}
         onConnectNotes={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
+        onIgnoreConnectionSuggestion={() => setMessage('Ignorar sugerencias desde web se agregara al flujo unificado.')}
         onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
         onCreateNote={() => void createNote()}
         onExportCurrentNoteMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}

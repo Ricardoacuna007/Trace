@@ -299,11 +299,22 @@ async function initializeSchema(db: Database): Promise<void> {
     )
   `)
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS ignored_suggestions (
+      source_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+      target_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+      ignored_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (source_id, target_id)
+    )
+  `)
+
   await db.execute('CREATE INDEX IF NOT EXISTS idx_nodes_parent_position ON nodes(parent_id, position)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_nodes_inbox_updated ON nodes(inbox, updated_at)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_note_relations_source ON note_relations(source_id)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_note_relations_target ON note_relations(target_id)')
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_ignored_suggestions_source ON ignored_suggestions(source_id)')
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_ignored_suggestions_target ON ignored_suggestions(target_id)')
 
   await migrateLegacyNotesIfNeeded(db)
   await ensureDefaultWorkspace(db)

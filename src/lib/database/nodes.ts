@@ -277,10 +277,25 @@ export async function listNoteRelations(): Promise<RelationRow[]> {
   )
 }
 
+export async function listIgnoredSuggestions(): Promise<RelationRow[]> {
+  const db = await getDatabase()
+  return db.select<RelationRow[]>(
+    'SELECT source_id, target_id FROM ignored_suggestions',
+  )
+}
+
 export async function addNoteRelation(sourceId: string, targetId: string): Promise<void> {
   const db = await getDatabase()
   await db.execute(
     'INSERT OR IGNORE INTO note_relations (source_id, target_id) VALUES ($1, $2)',
+    [sourceId, targetId],
+  )
+}
+
+export async function ignoreConnectionSuggestion(sourceId: string, targetId: string): Promise<void> {
+  const db = await getDatabase()
+  await db.execute(
+    'INSERT OR IGNORE INTO ignored_suggestions (source_id, target_id) VALUES ($1, $2)',
     [sourceId, targetId],
   )
 }

@@ -8,6 +8,7 @@ import { RightPanel } from './RightPanel'
 
 interface EditorLayoutProps {
   backlinks: NoteBacklink[]
+  ignoredSuggestionPairs: string[]
   nodes: AppNode[]
   note: Note
   noteRelations: NoteRelation[]
@@ -20,6 +21,7 @@ interface EditorLayoutProps {
   showWordCount: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
+  onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
   onOpenWikiLink: (title: string) => void
   onSelectNode: (id: string) => void
   onTitleChange: (noteId: string, title: string) => void
@@ -27,6 +29,7 @@ interface EditorLayoutProps {
 
 export function EditorLayout({
   backlinks,
+  ignoredSuggestionPairs,
   nodes,
   note,
   noteRelations,
@@ -39,6 +42,7 @@ export function EditorLayout({
   showWordCount,
   onContentChange,
   onConnectNotes,
+  onIgnoreConnectionSuggestion,
   onOpenWikiLink,
   onSelectNode,
   onTitleChange,
@@ -57,6 +61,7 @@ export function EditorLayout({
       {rightPanelMode === 'visible' ? (
         <RightPanel
           backlinks={backlinks}
+          ignoredSuggestionPairs={ignoredSuggestionPairs}
           nodes={nodes}
           note={note}
           noteRelations={noteRelations}
@@ -64,6 +69,7 @@ export function EditorLayout({
           showBacklinks={showBacklinks}
           showProperties={showProperties}
           onConnectNotes={onConnectNotes}
+          onIgnoreConnectionSuggestion={onIgnoreConnectionSuggestion}
           onSelectNode={onSelectNode}
         />
       ) : null}

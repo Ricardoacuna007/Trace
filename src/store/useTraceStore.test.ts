@@ -6,6 +6,8 @@ import { useTraceStore } from './useTraceStore'
 
 const dbMocks = vi.hoisted(() => ({
   addNoteRelation: vi.fn(),
+  ignoreConnectionSuggestion: vi.fn(),
+  listIgnoredSuggestions: vi.fn(),
   saveVaultCustomization: vi.fn(),
 }))
 
@@ -73,6 +75,8 @@ vi.mock('../lib/db', () => ({
   getCurrentVaultPath: vi.fn(),
   getNoteBacklinks: vi.fn(),
   importMarkdownDirectory: vi.fn(),
+  ignoreConnectionSuggestion: dbMocks.ignoreConnectionSuggestion,
+  listIgnoredSuggestions: dbMocks.listIgnoredSuggestions,
   listNodeRelations: vi.fn(),
   listNodes: vi.fn(),
   listNoteRelations: vi.fn(),
@@ -129,6 +133,7 @@ function resetStore() {
       note('note-a', 'Alpha') as AppNode & { type: 'note'; content: string },
       note('note-b', 'Beta') as AppNode & { type: 'note'; content: string },
     ],
+    ignoredSuggestionPairs: [],
     pinnedNoteIds: [],
     recentConnectionIds: [],
     traceConfigJson: DEFAULT_TRACE_CONFIG_JSON,
@@ -141,6 +146,9 @@ describe('useTraceStore frontend workspace actions', () => {
   beforeEach(() => {
     dbMocks.addNoteRelation.mockReset()
     dbMocks.addNoteRelation.mockResolvedValue(undefined)
+    dbMocks.ignoreConnectionSuggestion.mockReset()
+    dbMocks.ignoreConnectionSuggestion.mockResolvedValue(undefined)
+    dbMocks.listIgnoredSuggestions.mockReset()
     dbMocks.saveVaultCustomization.mockReset()
     dbMocks.saveVaultCustomization.mockImplementation(async (configJson: string, customCss: string) => ({
       traceDir: 'C:\\vault\\.trace',
@@ -161,6 +169,18 @@ describe('useTraceStore frontend workspace actions', () => {
       { sourceId: 'note-b', targetId: 'note-a' },
     ])
     expect(useTraceStore.getState().recentConnectionIds).toEqual(['note-b'])
+  })
+
+  it('ignoreConnectionSuggestion stores bidirectional ignored pairs', async () => {
+    await useTraceStore.getState().ignoreConnectionSuggestion('note-a', 'note-b')
+
+    expect(dbMocks.ignoreConnectionSuggestion).toHaveBeenCalledTimes(2)
+    expect(dbMocks.ignoreConnectionSuggestion).toHaveBeenCalledWith('note-a', 'note-b')
+    expect(dbMocks.ignoreConnectionSuggestion).toHaveBeenCalledWith('note-b', 'note-a')
+    expect(useTraceStore.getState().ignoredSuggestionPairs).toEqual([
+      'note-a->note-b',
+      'note-b->note-a',
+    ])
   })
 
   it('persists pinned note ids into trace config', async () => {

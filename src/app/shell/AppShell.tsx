@@ -39,6 +39,7 @@ interface AppShellProps {
   editorWidth: 'full' | 'centered'
   graphData: NoteGraphData
   hasPendingChanges: boolean
+  ignoredSuggestionPairs: string[]
   isBacklinksPanelOpen: boolean
   ioMessage: string | null
   ioWorking: boolean
@@ -70,6 +71,7 @@ interface AppShellProps {
   onExportCurrentNoteMarkdown: () => void
   onExportVaultMarkdown: () => void
   onImportMarkdown: () => void
+  onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
   onOpenCommandPalette: () => void
   onOpenConnectModal: () => void
   onOpenNode: (id: string) => void
@@ -139,6 +141,7 @@ export function AppShell({
   editorWidth,
   graphData,
   hasPendingChanges,
+  ignoredSuggestionPairs,
   isBacklinksPanelOpen,
   ioMessage,
   ioWorking,
@@ -170,6 +173,7 @@ export function AppShell({
   onExportCurrentNoteMarkdown,
   onExportVaultMarkdown,
   onImportMarkdown,
+  onIgnoreConnectionSuggestion,
   onOpenCommandPalette,
   onOpenConnectModal,
   onOpenNode,
@@ -313,6 +317,7 @@ export function AppShell({
               ) : null}
               <EditorLayout
                 backlinks={backlinks}
+                ignoredSuggestionPairs={ignoredSuggestionPairs}
                 nodes={nodes}
                 note={selectedNote}
                 noteRelations={noteRelations}
@@ -325,6 +330,7 @@ export function AppShell({
                 showWordCount={traceLayout.visible_elements.word_count}
                 onContentChange={onContentChange}
                 onConnectNotes={onConnectNotes}
+                onIgnoreConnectionSuggestion={onIgnoreConnectionSuggestion}
                 onOpenWikiLink={onOpenWikiLink}
                 onSelectNode={onOpenNode}
                 onTitleChange={onTitleChange}

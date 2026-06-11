@@ -1,6 +1,6 @@
 import { Check, FileText, Network, Sigma, Sparkles, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { pairKey, suggestConnections, type ConnectionSuggestion } from '../../features/notes-connections/suggestions'
+import { useMemo, type ReactNode } from 'react'
+import { suggestConnections, type ConnectionSuggestion } from '../../features/notes-connections/suggestions'
 import {
   buildBacklinkItems,
   countWords,
@@ -15,6 +15,7 @@ import type { AppNode } from '../../types/workspace'
 
 interface RightPanelProps {
   backlinks: NoteBacklink[]
+  ignoredSuggestionPairs: string[]
   nodes: AppNode[]
   note: Note
   noteRelations: NoteRelation[]
@@ -22,6 +23,7 @@ interface RightPanelProps {
   showBacklinks: boolean
   showProperties: boolean
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
+  onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
   onSelectNode: (id: string) => void
 }
 
@@ -37,23 +39,6 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
 function isBidirectional(noteId: string, sourceId: string, relations: NoteRelation[]): boolean {
   return relations.some((relation) => relation.sourceId === sourceId && relation.targetId === noteId)
     && relations.some((relation) => relation.sourceId === noteId && relation.targetId === sourceId)
-}
-
-function ignoredStorageKey(noteId: string): string {
-  return `trace:ignored-suggestions:${noteId}`
-}
-
-function readIgnoredPairs(noteId: string): Set<string> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(ignoredStorageKey(noteId)) ?? '[]')
-    return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function writeIgnoredPairs(noteId: string, pairs: Set<string>) {
-  window.localStorage.setItem(ignoredStorageKey(noteId), JSON.stringify([...pairs]))
 }
 
 function nodeKey(nodes: AppNode[]): string {
@@ -207,6 +192,7 @@ function MiniGraph({
 
 export function RightPanel({
   backlinks,
+  ignoredSuggestionPairs,
   nodes,
   note,
   noteRelations,
@@ -214,27 +200,17 @@ export function RightPanel({
   showBacklinks,
   showProperties,
   onConnectNotes,
+  onIgnoreConnectionSuggestion,
   onSelectNode,
 }: RightPanelProps) {
   const headings = extractHeadings(note.content)
   const backlinkItems = buildBacklinkItems(note.id, nodes, noteRelations, backlinks)
   const words = countWords(note.content)
   const outgoing = noteRelations.filter((relation) => relation.sourceId === note.id).length
-  const [ignoredPairs, setIgnoredPairs] = useState(() => readIgnoredPairs(note.id))
+  const ignoredPairs = useMemo(() => new Set(ignoredSuggestionPairs), [ignoredSuggestionPairs])
   const suggestions = useMemo(() => (
     suggestConnections(note, nodes, noteRelations, ignoredPairs)
   ), [ignoredPairs, nodeKey(nodes), note, noteRelations])
-
-  useEffect(() => {
-    setIgnoredPairs(readIgnoredPairs(note.id))
-  }, [note.id])
-
-  const ignoreSuggestion = (targetId: string) => {
-    const next = new Set(ignoredPairs)
-    next.add(pairKey(note.id, targetId))
-    setIgnoredPairs(next)
-    writeIgnoredPairs(note.id, next)
-  }
 
   return (
     <aside className="trace-scrollbar hidden h-full w-[var(--right-panel-w)] shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg2)] xl:block">
@@ -293,7 +269,7 @@ export function RightPanel({
                 key={suggestion.note.id}
                 suggestion={suggestion}
                 onAccept={(targetId) => onConnectNotes(note.id, [targetId])}
-                onIgnore={ignoreSuggestion}
+                onIgnore={(targetId) => onIgnoreConnectionSuggestion(note.id, targetId)}
                 onOpen={onSelectNode}
               />
             ))}

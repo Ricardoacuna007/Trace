@@ -44,6 +44,7 @@ function DesktopApp() {
     nodes,
     nodeTree,
     noteRelations,
+    ignoredSuggestionPairs,
     activeNoteId,
     activeView,
     pinnedNoteIds,
@@ -99,6 +100,7 @@ function DesktopApp() {
     discardDraft,
     commitDraftToDB,
     connectNotes,
+    ignoreConnectionSuggestion,
     openConnectModal,
     pinNote,
     queueNoteTitleSave,
@@ -377,6 +379,7 @@ function DesktopApp() {
         editorWidth={editorWidth}
         graphData={graphData}
         hasPendingChanges={isActiveNoteDirty}
+        ignoredSuggestionPairs={ignoredSuggestionPairs}
         isBacklinksPanelOpen={isBacklinksPanelOpen}
         ioMessage={ioMessage}
         ioWorking={ioWorking}
@@ -409,6 +412,7 @@ function DesktopApp() {
         onImportMarkdown={() => void handleImportMarkdown()}
         onOpenCommandPalette={openCommandPalette}
         onOpenConnectModal={openConnectModal}
+        onIgnoreConnectionSuggestion={(sourceId, targetId) => void ignoreConnectionSuggestion(sourceId, targetId)}
         onOpenNode={(id) => void handleSelectNode(id)}
         onOpenNodeFromGraph={handleOpenNodeFromGraph}
         onOpenWikiLink={(title) => void handleOpenWikiLink(title)}
