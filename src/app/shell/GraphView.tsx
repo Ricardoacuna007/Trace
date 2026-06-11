@@ -144,12 +144,6 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
   }, [clusters])
 
   useEffect(() => {
-    if (selectedClusterId && !clusters.some((cluster) => cluster.id === selectedClusterId)) {
-      setSelectedClusterId(null)
-    }
-  }, [clusters, selectedClusterId])
-
-  useEffect(() => {
     const wrapper = wrapperRef.current
     const svgElement = svgRef.current
     if (!wrapper || !svgElement) {

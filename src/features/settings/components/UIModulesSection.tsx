@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { TraceLayoutConfig, TraceUIModules } from '../../../lib/db'
 
 interface UIModulesSectionProps {
@@ -47,16 +47,14 @@ export function UIModulesSection({
   onUpdateTraceLayout,
   onToggleModule,
 }: UIModulesSectionProps) {
-  const [accentDraft, setAccentDraft] = useState(traceAccentColor)
+  const [accentDraft, setAccentDraft] = useState<string | null>(null)
   const safeAccentColor = isHexColor(traceAccentColor) ? traceAccentColor : '#5e8bff'
-
-  useEffect(() => {
-    setAccentDraft(traceAccentColor)
-  }, [traceAccentColor])
+  const accentInputValue = accentDraft ?? traceAccentColor
 
   const commitAccentColor = (value: string) => {
     if (isHexColor(value)) {
       onUpdateTraceAppearance({ accent_color: value })
+      setAccentDraft(null)
     }
   }
 
@@ -105,12 +103,11 @@ export function UIModulesSection({
               aria-label="Color de acento"
               className="h-8 w-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] p-1"
               onChange={(event) => {
-                setAccentDraft(event.target.value)
                 commitAccentColor(event.target.value)
               }}
             />
             <input
-              value={accentDraft}
+              value={accentInputValue}
               aria-label="Codigo de color de acento"
               className={`${inputClassName} min-w-0 flex-1 font-mono`}
               onBlur={(event) => commitAccentColor(event.target.value)}

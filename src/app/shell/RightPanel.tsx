@@ -43,10 +43,6 @@ function isBidirectional(noteId: string, sourceId: string, relations: NoteRelati
     && relations.some((relation) => relation.sourceId === noteId && relation.targetId === sourceId)
 }
 
-function nodeKey(nodes: AppNode[]): string {
-  return nodes.map((node) => `${node.id}:${node.updatedAt}`).join('|')
-}
-
 function BacklinkRow({
   item,
   noteId,
@@ -223,7 +219,7 @@ export function RightPanel({
   const ignoredPairs = useMemo(() => new Set(ignoredSuggestionPairs), [ignoredSuggestionPairs])
   const suggestions = useMemo(() => (
     suggestConnections(note, nodes, noteRelations, ignoredPairs)
-  ), [ignoredPairs, nodeKey(nodes), note, noteRelations])
+  ), [ignoredPairs, nodes, note, noteRelations])
 
   return (
     <aside className="trace-scrollbar hidden h-full w-[var(--right-panel-w)] shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg2)] xl:block">
