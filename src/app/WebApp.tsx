@@ -510,6 +510,7 @@ export function WebApp() {
         onConnectNotes={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
         onDisconnectNotes={() => setMessage('Desconectar notas desde web se agregara al flujo unificado.')}
         onIgnoreConnectionSuggestion={() => setMessage('Ignorar sugerencias desde web se agregara al flujo unificado.')}
+        onMoveNode={() => setMessage('Procesar bandeja desde web se agregara al flujo unificado.')}
         onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
         onCreateNote={() => void createNote()}
         onExportCurrentNoteMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}

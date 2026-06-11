@@ -73,6 +73,7 @@ interface AppShellProps {
   onExportVaultMarkdown: () => void
   onImportMarkdown: () => void
   onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
+  onMoveNode: (id: string, newParentId: string | null) => void
   onOpenCommandPalette: () => void
   onOpenConnectModal: () => void
   onOpenNode: (id: string) => void
@@ -176,6 +177,7 @@ export function AppShell({
   onExportVaultMarkdown,
   onImportMarkdown,
   onIgnoreConnectionSuggestion,
+  onMoveNode,
   onOpenCommandPalette,
   onOpenConnectModal,
   onOpenNode,
@@ -335,6 +337,7 @@ export function AppShell({
                 onConnectNotes={onConnectNotes}
                 onDisconnectNotes={onDisconnectNotes}
                 onIgnoreConnectionSuggestion={onIgnoreConnectionSuggestion}
+                onMoveNode={onMoveNode}
                 onOpenWikiLink={onOpenWikiLink}
                 onSelectNode={onOpenNode}
                 onTitleChange={onTitleChange}

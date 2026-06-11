@@ -23,6 +23,7 @@ interface EditorLayoutProps {
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
   onDisconnectNotes: (sourceId: string, targetId: string) => void
   onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
+  onMoveNode: (id: string, newParentId: string | null) => void
   onOpenWikiLink: (title: string) => void
   onSelectNode: (id: string) => void
   onTitleChange: (noteId: string, title: string) => void
@@ -45,6 +46,7 @@ export function EditorLayout({
   onConnectNotes,
   onDisconnectNotes,
   onIgnoreConnectionSuggestion,
+  onMoveNode,
   onOpenWikiLink,
   onSelectNode,
   onTitleChange,
@@ -73,6 +75,7 @@ export function EditorLayout({
           onConnectNotes={onConnectNotes}
           onDisconnectNotes={onDisconnectNotes}
           onIgnoreConnectionSuggestion={onIgnoreConnectionSuggestion}
+          onMoveNode={onMoveNode}
           onSelectNode={onSelectNode}
         />
       ) : null}

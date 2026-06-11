@@ -96,6 +96,7 @@ function DesktopApp() {
     createFolder,
     createNewNote,
     createNoteFromTitle,
+    moveNodeById,
     beginNoteDraft,
     discardDraft,
     commitDraftToDB,
@@ -415,6 +416,7 @@ function DesktopApp() {
         onOpenCommandPalette={openCommandPalette}
         onOpenConnectModal={openConnectModal}
         onIgnoreConnectionSuggestion={(sourceId, targetId) => void ignoreConnectionSuggestion(sourceId, targetId)}
+        onMoveNode={(id, newParentId) => void moveNodeById(id, newParentId)}
         onOpenNode={(id) => void handleSelectNode(id)}
         onOpenNodeFromGraph={handleOpenNodeFromGraph}
         onOpenWikiLink={(title) => void handleOpenWikiLink(title)}

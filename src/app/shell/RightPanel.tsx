@@ -1,6 +1,7 @@
-import { Check, FileText, Network, Sigma, Sparkles, X } from 'lucide-react'
+import { Check, FileText, Folder, MoveRight, Network, Sigma, Sparkles, X } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { CodeRunnerSection } from '../../features/code-runner/CodeRunnerSection'
+import { suggestInboxDestinations, type InboxDestination } from '../../features/inbox/destinations'
 import { suggestConnections, type ConnectionSuggestion } from '../../features/notes-connections/suggestions'
 import {
   buildBacklinkItems,
@@ -26,6 +27,7 @@ interface RightPanelProps {
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
   onDisconnectNotes: (sourceId: string, targetId: string) => void
   onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
+  onMoveNode: (id: string, newParentId: string | null) => void
   onSelectNode: (id: string) => void
 }
 
@@ -140,6 +142,33 @@ function SuggestionCard({
   )
 }
 
+function InboxDestinationRow({
+  destination,
+  noteId,
+  onMoveNode,
+}: {
+  destination: InboxDestination
+  noteId: string
+  onMoveNode: (id: string, newParentId: string | null) => void
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-left transition-all hover:border-[var(--border2)] hover:bg-[var(--bg3)]"
+      onClick={() => onMoveNode(noteId, destination.id)}
+    >
+      <Folder className="h-3.5 w-3.5 shrink-0 text-[var(--amber)]" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12px] font-medium text-[var(--t1)]">{destination.title}</span>
+        <span className="block font-mono text-[10px] text-[var(--t3)]">
+          {destination.relatedCount > 0 ? `${destination.relatedCount} notas relacionadas` : destination.type}
+        </span>
+      </span>
+      <MoveRight className="h-3.5 w-3.5 shrink-0 text-[var(--t3)]" />
+    </button>
+  )
+}
+
 function MiniGraph({
   noteId,
   relations,
@@ -210,6 +239,7 @@ export function RightPanel({
   onConnectNotes,
   onDisconnectNotes,
   onIgnoreConnectionSuggestion,
+  onMoveNode,
   onSelectNode,
 }: RightPanelProps) {
   const headings = extractHeadings(note.content)
@@ -220,6 +250,9 @@ export function RightPanel({
   const suggestions = useMemo(() => (
     suggestConnections(note, nodes, noteRelations, ignoredPairs)
   ), [ignoredPairs, nodes, note, noteRelations])
+  const inboxDestinations = useMemo(() => (
+    suggestInboxDestinations(note, nodes, noteRelations)
+  ), [nodes, note, noteRelations])
 
   return (
     <aside className="trace-scrollbar hidden h-full w-[var(--right-panel-w)] shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg2)] xl:block">
@@ -246,6 +279,25 @@ export function RightPanel({
           </div>
         )}
       </Section>
+
+      {note.inbox ? (
+        <Section title="Procesar bandeja">
+          {inboxDestinations.length === 0 ? (
+            <p className="text-[11px] text-[var(--t3)]">Crea una carpeta para procesar esta captura.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {inboxDestinations.map((destination) => (
+                <InboxDestinationRow
+                  key={destination.id}
+                  destination={destination}
+                  noteId={note.id}
+                  onMoveNode={onMoveNode}
+                />
+              ))}
+            </div>
+          )}
+        </Section>
+      ) : null}
 
       {showBacklinks ? (
         <Section title="Notas relacionadas">
