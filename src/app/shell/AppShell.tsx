@@ -281,6 +281,7 @@ export function AppShell({
             <Suspense fallback={<ViewFallback label="Cargando grafo..." />}>
               <LazyGraphView
                 graph={graphData}
+                workspaceNodes={nodes}
                 selectedNoteId={selectedNote?.id ?? null}
                 onOpenNote={onOpenNodeFromGraph}
               />
