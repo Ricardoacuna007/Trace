@@ -1,3 +1,4 @@
+pub mod code_runner;
 pub mod customization;
 pub mod graph;
 pub mod markdown_db;
