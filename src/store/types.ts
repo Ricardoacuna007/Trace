@@ -87,6 +87,7 @@ export interface WorkspaceSlice {
   addRelationByIds: (sourceId: string, targetId: string) => Promise<void>
   removeRelationByIds: (sourceId: string, targetId: string) => Promise<void>
   connectNotes: (sourceId: string, targetIds: string[]) => Promise<void>
+  disconnectNotes: (sourceId: string, targetId: string) => Promise<void>
   ignoreConnectionSuggestion: (sourceId: string, targetId: string) => Promise<void>
   getBacklinks: (noteId: string) => Note[]
   pinNote: (noteId: string) => void

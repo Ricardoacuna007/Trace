@@ -100,6 +100,7 @@ function DesktopApp() {
     discardDraft,
     commitDraftToDB,
     connectNotes,
+    disconnectNotes,
     ignoreConnectionSuggestion,
     openConnectModal,
     pinNote,
@@ -405,6 +406,7 @@ function DesktopApp() {
         viewMode={viewMode}
         onContentChange={handleContentChange}
         onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
+        onDisconnectNotes={(sourceId, targetId) => void disconnectNotes(sourceId, targetId)}
         onCreateFolder={() => void createFolder()}
         onCreateNote={handleCreateNoteShortcut}
         onExportCurrentNoteMarkdown={() => void handleExportCurrentNote()}

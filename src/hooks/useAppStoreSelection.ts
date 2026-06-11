@@ -73,6 +73,7 @@ export function useAppStoreSelection() {
       addDraftRelation: state.addDraftRelation,
       removeDraftRelation: state.removeDraftRelation,
       connectNotes: state.connectNotes,
+      disconnectNotes: state.disconnectNotes,
       ignoreConnectionSuggestion: state.ignoreConnectionSuggestion,
       openConnectModal: state.openConnectModal,
       pinNote: state.pinNote,

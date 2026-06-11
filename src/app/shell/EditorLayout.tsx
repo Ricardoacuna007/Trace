@@ -21,6 +21,7 @@ interface EditorLayoutProps {
   showWordCount: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
+  onDisconnectNotes: (sourceId: string, targetId: string) => void
   onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
   onOpenWikiLink: (title: string) => void
   onSelectNode: (id: string) => void
@@ -42,6 +43,7 @@ export function EditorLayout({
   showWordCount,
   onContentChange,
   onConnectNotes,
+  onDisconnectNotes,
   onIgnoreConnectionSuggestion,
   onOpenWikiLink,
   onSelectNode,
@@ -69,6 +71,7 @@ export function EditorLayout({
           showBacklinks={showBacklinks}
           showProperties={showProperties}
           onConnectNotes={onConnectNotes}
+          onDisconnectNotes={onDisconnectNotes}
           onIgnoreConnectionSuggestion={onIgnoreConnectionSuggestion}
           onSelectNode={onSelectNode}
         />

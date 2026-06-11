@@ -90,6 +90,7 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
   addRelationByIds: (sourceId: string, targetId: string) => Promise<void>
   removeRelationByIds: (sourceId: string, targetId: string) => Promise<void>
   connectNotes: (sourceId: string, targetIds: string[]) => Promise<void>
+  disconnectNotes: (sourceId: string, targetId: string) => Promise<void>
   ignoreConnectionSuggestion: (sourceId: string, targetId: string) => Promise<void>
   getBacklinks: (noteId: string) => NotesState['notes']
   pinNote: (noteId: string) => void
@@ -457,6 +458,35 @@ export const createWorkspaceSlice = (deps: WorkspaceSliceDeps): SliceCreator<{
       await get().refreshGraph(undefined, mergedRelations)
     } catch (error) {
       set({ error: `No se pudieron conectar las notas: ${deps.normalizeError(error)}` })
+    }
+  },
+  disconnectNotes: async (sourceId, targetId) => {
+    const normalizedSource = sourceId.trim()
+    const normalizedTarget = targetId.trim()
+    if (!normalizedSource || !normalizedTarget || normalizedSource === normalizedTarget) {
+      return
+    }
+
+    try {
+      await removeNoteRelation(normalizedSource, normalizedTarget)
+      await removeNoteRelation(normalizedTarget, normalizedSource)
+
+      const noteRelations = get().noteRelations.filter((relation) => (
+        !(
+          (relation.sourceId === normalizedSource && relation.targetId === normalizedTarget) ||
+          (relation.sourceId === normalizedTarget && relation.targetId === normalizedSource)
+        )
+      ))
+
+      set({
+        noteRelations,
+        connections: noteRelations,
+        recentConnectionIds: get().recentConnectionIds.filter((id) => id !== normalizedTarget),
+        error: null,
+      })
+      await get().refreshGraph(undefined, noteRelations)
+    } catch (error) {
+      set({ error: `No se pudo desconectar la nota: ${deps.normalizeError(error)}` })
     }
   },
   ignoreConnectionSuggestion: async (sourceId, targetId) => {

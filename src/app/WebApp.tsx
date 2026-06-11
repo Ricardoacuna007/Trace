@@ -508,6 +508,7 @@ export function WebApp() {
         viewMode={viewMode}
         onContentChange={handleContentChange}
         onConnectNotes={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
+        onDisconnectNotes={() => setMessage('Desconectar notas desde web se agregara al flujo unificado.')}
         onIgnoreConnectionSuggestion={() => setMessage('Ignorar sugerencias desde web se agregara al flujo unificado.')}
         onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
         onCreateNote={() => void createNote()}

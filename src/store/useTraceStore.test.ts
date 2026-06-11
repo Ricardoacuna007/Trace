@@ -8,6 +8,7 @@ const dbMocks = vi.hoisted(() => ({
   addNoteRelation: vi.fn(),
   ignoreConnectionSuggestion: vi.fn(),
   listIgnoredSuggestions: vi.fn(),
+  removeNoteRelation: vi.fn(),
   saveVaultCustomization: vi.fn(),
 }))
 
@@ -84,7 +85,7 @@ vi.mock('../lib/db', () => ({
   parseTraceConfig: parseMockTraceConfig,
   persistNote: vi.fn(),
   readVaultCustomization: vi.fn(),
-  removeNoteRelation: vi.fn(),
+  removeNoteRelation: dbMocks.removeNoteRelation,
   renameNode: vi.fn(),
   saveVaultCustomization: dbMocks.saveVaultCustomization,
   scanMarkdownDatabase: vi.fn(),
@@ -148,6 +149,8 @@ describe('useTraceStore frontend workspace actions', () => {
     dbMocks.addNoteRelation.mockResolvedValue(undefined)
     dbMocks.ignoreConnectionSuggestion.mockReset()
     dbMocks.ignoreConnectionSuggestion.mockResolvedValue(undefined)
+    dbMocks.removeNoteRelation.mockReset()
+    dbMocks.removeNoteRelation.mockResolvedValue(undefined)
     dbMocks.listIgnoredSuggestions.mockReset()
     dbMocks.saveVaultCustomization.mockReset()
     dbMocks.saveVaultCustomization.mockImplementation(async (configJson: string, customCss: string) => ({
@@ -169,6 +172,32 @@ describe('useTraceStore frontend workspace actions', () => {
       { sourceId: 'note-b', targetId: 'note-a' },
     ])
     expect(useTraceStore.getState().recentConnectionIds).toEqual(['note-b'])
+  })
+
+  it('disconnectNotes removes bidirectional local relations', async () => {
+    useTraceStore.setState({
+      noteRelations: [
+        { sourceId: 'note-a', targetId: 'note-b' },
+        { sourceId: 'note-b', targetId: 'note-a' },
+        { sourceId: 'note-b', targetId: 'note-c' },
+      ],
+      connections: [
+        { sourceId: 'note-a', targetId: 'note-b' },
+        { sourceId: 'note-b', targetId: 'note-a' },
+        { sourceId: 'note-b', targetId: 'note-c' },
+      ],
+      recentConnectionIds: ['note-b'],
+    })
+
+    await useTraceStore.getState().disconnectNotes('note-a', 'note-b')
+
+    expect(dbMocks.removeNoteRelation).toHaveBeenCalledTimes(2)
+    expect(dbMocks.removeNoteRelation).toHaveBeenCalledWith('note-a', 'note-b')
+    expect(dbMocks.removeNoteRelation).toHaveBeenCalledWith('note-b', 'note-a')
+    expect(useTraceStore.getState().noteRelations).toEqual([
+      { sourceId: 'note-b', targetId: 'note-c' },
+    ])
+    expect(useTraceStore.getState().recentConnectionIds).toEqual([])
   })
 
   it('ignoreConnectionSuggestion stores bidirectional ignored pairs', async () => {

@@ -66,6 +66,7 @@ interface AppShellProps {
   renderConnectModal?: boolean
   onContentChange: (noteId: string, blocks: Block[]) => void
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
+  onDisconnectNotes: (sourceId: string, targetId: string) => void
   onCreateFolder: () => void
   onCreateNote: () => void
   onExportCurrentNoteMarkdown: () => void
@@ -168,6 +169,7 @@ export function AppShell({
   renderConnectModal = true,
   onContentChange,
   onConnectNotes,
+  onDisconnectNotes,
   onCreateFolder,
   onCreateNote,
   onExportCurrentNoteMarkdown,
@@ -331,6 +333,7 @@ export function AppShell({
                 showWordCount={traceLayout.visible_elements.word_count}
                 onContentChange={onContentChange}
                 onConnectNotes={onConnectNotes}
+                onDisconnectNotes={onDisconnectNotes}
                 onIgnoreConnectionSuggestion={onIgnoreConnectionSuggestion}
                 onOpenWikiLink={onOpenWikiLink}
                 onSelectNode={onOpenNode}

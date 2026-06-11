@@ -24,6 +24,7 @@ interface RightPanelProps {
   showBacklinks: boolean
   showProperties: boolean
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
+  onDisconnectNotes: (sourceId: string, targetId: string) => void
   onIgnoreConnectionSuggestion: (sourceId: string, targetId: string) => void
   onSelectNode: (id: string) => void
 }
@@ -51,38 +52,48 @@ function BacklinkRow({
   noteId,
   recentConnectionIds,
   relations,
+  onDisconnect,
   onSelectNode,
 }: {
   item: BacklinkViewItem
   noteId: string
   recentConnectionIds: string[]
   relations: NoteRelation[]
+  onDisconnect: (sourceId: string) => void
   onSelectNode: (id: string) => void
 }) {
   const bidirectional = isBidirectional(noteId, item.sourceId, relations)
   const recent = recentConnectionIds.includes(item.sourceId)
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelectNode(item.sourceId)}
-      className={`w-full rounded-[var(--radius-md)] border border-transparent bg-[var(--bg2)] px-2 py-2 text-left transition-all duration-150 hover:border-[var(--border2)] hover:bg-[var(--bg3)] ${
+    <div
+      className={`group w-full rounded-[var(--radius-md)] border border-transparent bg-[var(--bg2)] px-2 py-2 text-left transition-all duration-150 hover:border-[var(--border2)] hover:bg-[var(--bg3)] ${
         recent ? 'animate-fadeUp' : ''
       }`}
     >
       <div className="flex gap-2">
-        <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--t3)]" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-medium text-[var(--t1)]" title={item.title}>{item.title}</p>
-          <p className="line-clamp-2 text-[11px] leading-snug text-[var(--t2)]">"{item.preview}"</p>
-          {bidirectional ? (
-            <span className="mt-1 inline-flex rounded-full border border-[rgba(74,222,128,0.25)] bg-[rgba(74,222,128,0.08)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--green)]">
-              bidireccional
-            </span>
-          ) : null}
-        </div>
+        <button type="button" onClick={() => onSelectNode(item.sourceId)} className="flex min-w-0 flex-1 gap-2 text-left">
+          <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--t3)]" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12px] font-medium text-[var(--t1)]" title={item.title}>{item.title}</span>
+            <span className="line-clamp-2 text-[11px] leading-snug text-[var(--t2)]">"{item.preview}"</span>
+            {bidirectional ? (
+              <span className="mt-1 inline-flex rounded-full border border-[rgba(74,222,128,0.25)] bg-[rgba(74,222,128,0.08)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--green)]">
+                bidireccional
+              </span>
+            ) : null}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label={`Desconectar ${item.title}`}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--t3)] opacity-0 transition-all hover:bg-[rgba(248,113,113,0.1)] hover:text-[var(--red)] group-hover:opacity-100"
+          onClick={() => onDisconnect(item.sourceId)}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -201,6 +212,7 @@ export function RightPanel({
   showBacklinks,
   showProperties,
   onConnectNotes,
+  onDisconnectNotes,
   onIgnoreConnectionSuggestion,
   onSelectNode,
 }: RightPanelProps) {
@@ -252,6 +264,7 @@ export function RightPanel({
                   noteId={note.id}
                   recentConnectionIds={recentConnectionIds}
                   relations={noteRelations}
+                  onDisconnect={(sourceId) => onDisconnectNotes(note.id, sourceId)}
                   onSelectNode={onSelectNode}
                 />
               ))}
