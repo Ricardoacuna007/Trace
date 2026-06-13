@@ -6,6 +6,7 @@ export type {
   MarkdownDbSnapshot,
   NoteBacklink,
   NoteSearchResult,
+  TraceCodeRunnerSettings,
   TraceConfig,
   TraceEditorSettings,
   TraceGraphSettings,

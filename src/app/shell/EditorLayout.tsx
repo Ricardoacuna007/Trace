@@ -1,5 +1,5 @@
 ﻿import type { Block } from '@blocknote/core'
-import type { NoteBacklink, TraceRightPanelMode } from '../../lib/db'
+import type { NoteBacklink, TraceCodeRunnerSettings, TraceRightPanelMode } from '../../lib/db'
 import type { NoteRelation } from '../../store/types'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
@@ -13,6 +13,7 @@ interface EditorLayoutProps {
   note: Note
   noteRelations: NoteRelation[]
   recentConnectionIds: string[]
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   editorWidth: 'full' | 'centered'
   rightPanelMode: TraceRightPanelMode
   showBacklinks: boolean
@@ -36,6 +37,7 @@ export function EditorLayout({
   note,
   noteRelations,
   recentConnectionIds,
+  traceCodeRunnerSettings,
   editorWidth,
   rightPanelMode,
   showBacklinks,
@@ -58,6 +60,7 @@ export function EditorLayout({
         editorWidth={editorWidth}
         showModifiedAt={showModifiedAt}
         showWordCount={showWordCount}
+        traceCodeRunnerSettings={traceCodeRunnerSettings}
         onContentChange={onContentChange}
         onOpenWikiLink={onOpenWikiLink}
         onTitleChange={onTitleChange}
@@ -70,6 +73,7 @@ export function EditorLayout({
           note={note}
           noteRelations={noteRelations}
           recentConnectionIds={recentConnectionIds}
+          traceCodeRunnerSettings={traceCodeRunnerSettings}
           showBacklinks={showBacklinks}
           showProperties={showProperties}
           onConnectNotes={onConnectNotes}

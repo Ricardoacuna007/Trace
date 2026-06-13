@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react'
-import type { TraceEditorSettings, TraceGraphSettings, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
+import type {
+  TraceCodeRunnerSettings,
+  TraceEditorSettings,
+  TraceGraphSettings,
+  TraceLayoutConfig,
+  TraceUIModules,
+} from '../../lib/db'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
 import { CustomizationEditors } from './components/CustomizationEditors'
@@ -22,6 +28,7 @@ interface SettingsViewProps {
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   traceEditorSettings: TraceEditorSettings
   traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
@@ -40,6 +47,7 @@ interface SettingsViewProps {
     accent_color: string
     font_family: string
   }>) => void
+  onUpdateTraceCodeRunnerSettings: (patch: Partial<TraceCodeRunnerSettings>) => void
   onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
   onUpdateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
@@ -60,6 +68,7 @@ export function SettingsView({
   traceTheme,
   traceAccentColor,
   traceFontFamily,
+  traceCodeRunnerSettings,
   traceEditorSettings,
   traceGraphSettings,
   traceLayout,
@@ -74,6 +83,7 @@ export function SettingsView({
   onReloadWorkspace,
   onSetEditorWidth,
   onUpdateTraceAppearance,
+  onUpdateTraceCodeRunnerSettings,
   onUpdateTraceEditorSettings,
   onUpdateTraceGraphSettings,
   onUpdateTraceLayout,
@@ -125,12 +135,14 @@ export function SettingsView({
           traceTheme={traceTheme}
           traceAccentColor={traceAccentColor}
           traceFontFamily={traceFontFamily}
+          traceCodeRunnerSettings={traceCodeRunnerSettings}
           traceEditorSettings={traceEditorSettings}
           traceGraphSettings={traceGraphSettings}
           traceLayout={traceLayout}
           uiModules={uiModules}
           onSetEditorWidth={onSetEditorWidth}
           onUpdateTraceAppearance={onUpdateTraceAppearance}
+          onUpdateTraceCodeRunnerSettings={onUpdateTraceCodeRunnerSettings}
           onUpdateTraceEditorSettings={onUpdateTraceEditorSettings}
           onUpdateTraceGraphSettings={onUpdateTraceGraphSettings}
           onUpdateTraceLayout={onUpdateTraceLayout}

@@ -2,6 +2,7 @@ import type { Block } from '@blocknote/core'
 import { useEffect, useRef } from 'react'
 import { countWords, formatRelativeTime, readingMinutes } from '../../features/notes-editor/contentMetrics'
 import { NoteEditorBody } from '../../features/notes-editor/components/NoteEditorBody'
+import type { TraceCodeRunnerSettings } from '../../lib/db'
 import type { Note } from '../../types/note'
 
 interface EditorWrapperProps {
@@ -9,6 +10,7 @@ interface EditorWrapperProps {
   editorWidth: 'full' | 'centered'
   showModifiedAt: boolean
   showWordCount: boolean
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   onContentChange: (noteId: string, blocks: Block[]) => void
   onOpenWikiLink: (title: string) => void
   onTitleChange: (noteId: string, title: string) => void
@@ -19,6 +21,7 @@ export function EditorWrapper({
   editorWidth,
   showModifiedAt,
   showWordCount,
+  traceCodeRunnerSettings,
   onContentChange,
   onOpenWikiLink,
   onTitleChange,
@@ -71,7 +74,12 @@ export function EditorWrapper({
         ) : (
           <div className="mb-5" />
         )}
-        <NoteEditorBody note={note} onContentChange={onContentChange} onOpenWikiLink={onOpenWikiLink} />
+        <NoteEditorBody
+          note={note}
+          traceCodeRunnerSettings={traceCodeRunnerSettings}
+          onContentChange={onContentChange}
+          onOpenWikiLink={onOpenWikiLink}
+        />
       </div>
     </section>
   )

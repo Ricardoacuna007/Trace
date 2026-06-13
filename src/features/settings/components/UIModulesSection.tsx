@@ -1,11 +1,18 @@
 import { useState, type ReactNode } from 'react'
-import type { TraceEditorSettings, TraceGraphSettings, TraceLayoutConfig, TraceUIModules } from '../../../lib/db'
+import type {
+  TraceCodeRunnerSettings,
+  TraceEditorSettings,
+  TraceGraphSettings,
+  TraceLayoutConfig,
+  TraceUIModules,
+} from '../../../lib/db'
 
 interface UIModulesSectionProps {
   editorWidth: 'full' | 'centered'
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   traceEditorSettings: TraceEditorSettings
   traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
@@ -16,6 +23,7 @@ interface UIModulesSectionProps {
     accent_color: string
     font_family: string
   }>) => void
+  onUpdateTraceCodeRunnerSettings: (patch: Partial<TraceCodeRunnerSettings>) => void
   onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
   onUpdateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
@@ -45,12 +53,14 @@ export function UIModulesSection({
   traceTheme,
   traceAccentColor,
   traceFontFamily,
+  traceCodeRunnerSettings,
   traceEditorSettings,
   traceGraphSettings,
   traceLayout,
   uiModules,
   onSetEditorWidth,
   onUpdateTraceAppearance,
+  onUpdateTraceCodeRunnerSettings,
   onUpdateTraceEditorSettings,
   onUpdateTraceGraphSettings,
   onUpdateTraceLayout,
@@ -238,7 +248,7 @@ export function UIModulesSection({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg3)] px-3 py-3">
           <FieldLabel>Elementos visibles</FieldLabel>
           <div className="space-y-2 text-xs">
@@ -323,6 +333,32 @@ export function UIModulesSection({
               value={traceGraphSettings.node_scale}
               onChange={(value) => onUpdateTraceGraphSettings({ node_scale: value })}
             />
+          </div>
+        </div>
+
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg3)] px-3 py-3">
+          <FieldLabel>Codigo</FieldLabel>
+          <div className="space-y-3 text-xs">
+            <RangeField
+              label="Timeout"
+              max={120}
+              min={5}
+              suffix="s"
+              value={Math.round(traceCodeRunnerSettings.timeout_ms / 1000)}
+              onChange={(value) => onUpdateTraceCodeRunnerSettings({ timeout_ms: value * 1000 })}
+            />
+            <RangeField
+              label="Salida maxima"
+              max={50_000}
+              min={1_000}
+              step={1_000}
+              suffix=" chars"
+              value={traceCodeRunnerSettings.max_output_chars}
+              onChange={(value) => onUpdateTraceCodeRunnerSettings({ max_output_chars: value })}
+            />
+            <p className="text-[11px] leading-snug text-[var(--t3)]">
+              Aplica a los botones Run del editor y del panel derecho.
+            </p>
           </div>
         </div>
       </div>

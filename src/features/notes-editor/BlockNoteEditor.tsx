@@ -6,10 +6,12 @@ import type { Block } from '@blocknote/core'
 import { useInlineCodeRunner } from '../code-runner/useInlineCodeRunner'
 import { parseBlocks } from './note-utils'
 import { getWikiLinkAtTextOffset } from './wikiLinks'
+import type { TraceCodeRunnerSettings } from '../../lib/db'
 import type { Note } from '../../types/note'
 
 interface BlockNoteEditorProps {
   note: Note
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   onChange: (noteId: string, blocks: Block[]) => void
   onOpenWikiLink: (title: string) => void
 }
@@ -129,7 +131,12 @@ function getTextPositionFromPoint(clientX: number, clientY: number): { node: Tex
   return null
 }
 
-export function BlockNoteEditor({ note, onChange, onOpenWikiLink }: BlockNoteEditorProps) {
+export function BlockNoteEditor({
+  note,
+  traceCodeRunnerSettings,
+  onChange,
+  onOpenWikiLink,
+}: BlockNoteEditorProps) {
   const editorRootRef = useRef<HTMLDivElement | null>(null)
   const initialContent = useMemo(() => parseBlocks(note.content), [note.content])
 
@@ -139,7 +146,7 @@ export function BlockNoteEditor({ note, onChange, onOpenWikiLink }: BlockNoteEdi
     },
     [note.id],
   )
-  useInlineCodeRunner(editor, editorRootRef, note.id)
+  useInlineCodeRunner(editor, editorRootRef, note.id, traceCodeRunnerSettings)
 
   const handleEditorChange = useCallback(() => {
     onChange(note.id, [...editor.document])

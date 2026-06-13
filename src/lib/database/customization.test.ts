@@ -87,4 +87,18 @@ describe('parseTraceConfig', () => {
       node_scale: 1.5,
     })
   })
+
+  it('normalizes code runner limits', () => {
+    const config = parseTraceConfig(JSON.stringify({
+      code_runner: {
+        timeout_ms: 999_999,
+        max_output_chars: 100,
+      },
+    }))
+
+    expect(config.code_runner).toEqual({
+      timeout_ms: 120_000,
+      max_output_chars: 1_000,
+    })
+  })
 })

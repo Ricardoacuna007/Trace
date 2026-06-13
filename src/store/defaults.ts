@@ -20,6 +20,10 @@ export const DEFAULT_TRACE_CONFIG_JSON = JSON.stringify(
       show_labels: true,
       node_scale: 1,
     },
+    code_runner: {
+      timeout_ms: 30000,
+      max_output_chars: 10000,
+    },
     vim_mode: false,
     pinned_note_ids: [],
     layout: {

@@ -1,5 +1,6 @@
 import type { Block, BlockNoteEditor } from '@blocknote/core'
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import type { TraceCodeRunnerSettings } from '../../lib/db'
 import { snippetFromBlock, type CodeBlockSnippet } from './codeBlocks'
 import type { CodeOutput } from './useCodeRunner'
 import { useCodeRunner } from './useCodeRunner'
@@ -170,8 +171,9 @@ export function useInlineCodeRunner(
   editor: BlockNoteEditor,
   rootRef: RefObject<HTMLElement | null>,
   noteId: string,
+  settings: TraceCodeRunnerSettings,
 ) {
-  const runner = useCodeRunner()
+  const runner = useCodeRunner(settings)
   const applyingRef = useRef(false)
 
   const refreshControls = useCallback(() => {

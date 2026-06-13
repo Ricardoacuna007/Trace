@@ -503,6 +503,7 @@ export function WebApp() {
         traceTheme={DEFAULT_TRACE_CONFIG.theme}
         traceAccentColor={DEFAULT_TRACE_CONFIG.accent_color}
         traceFontFamily={DEFAULT_TRACE_CONFIG.font_family}
+        traceCodeRunnerSettings={DEFAULT_TRACE_CONFIG.code_runner}
         traceEditorSettings={DEFAULT_TRACE_CONFIG.editor}
         traceGraphSettings={DEFAULT_TRACE_CONFIG.graph}
         traceLayout={DEFAULT_TRACE_CONFIG.layout}
@@ -533,6 +534,7 @@ export function WebApp() {
         }}
         onSetEditorWidth={() => setMessage('El ancho del editor web se configurara en settings self-host.')}
         onUpdateTraceAppearance={() => setMessage('La apariencia web se configurara en settings self-host.')}
+        onUpdateTraceCodeRunnerSettings={() => setMessage('La ejecucion de codigo web se configurara en settings self-host.')}
         onUpdateTraceEditorSettings={() => setMessage('El editor web se configurara en settings self-host.')}
         onUpdateTraceGraphSettings={() => setMessage('El grafo web se configurara en settings self-host.')}
         onUpdateTraceLayout={() => setMessage('El layout web se configurara en settings self-host.')}

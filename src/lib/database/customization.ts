@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauriRuntime } from './runtime'
 import type {
   TraceConfig,
+  TraceCodeRunnerSettings,
   TraceEditorSettings,
   TraceGraphSettings,
   TraceLayoutConfig,
@@ -86,6 +87,10 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     show_labels: true,
     node_scale: 1,
   }
+  const defaultCodeRunner: TraceCodeRunnerSettings = {
+    timeout_ms: 30_000,
+    max_output_chars: 10_000,
+  }
 
   const fallback: TraceConfig = {
     theme: 'dark',
@@ -94,6 +99,7 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     editor_width: 'centered',
     editor: defaultEditor,
     graph: defaultGraph,
+    code_runner: defaultCodeRunner,
     vim_mode: false,
     layout: defaultLayout,
     ui_modules: defaultUiModules,
@@ -127,6 +133,9 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     const rawGraph = config.graph && typeof config.graph === 'object'
       ? config.graph as Record<string, unknown>
       : {}
+    const rawCodeRunner = config.code_runner && typeof config.code_runner === 'object'
+      ? config.code_runner as Record<string, unknown>
+      : {}
 
     return {
       ...fallback,
@@ -147,6 +156,10 @@ export function parseTraceConfig(configJson: string): TraceConfig {
         cluster_colors: parseColorArray(rawGraph.cluster_colors, defaultGraph.cluster_colors, 6),
         show_labels: Boolean(rawGraph.show_labels ?? defaultGraph.show_labels),
         node_scale: numberInRange(rawGraph.node_scale, defaultGraph.node_scale, 0.75, 1.5),
+      },
+      code_runner: {
+        timeout_ms: Math.round(numberInRange(rawCodeRunner.timeout_ms, defaultCodeRunner.timeout_ms, 5_000, 120_000)),
+        max_output_chars: Math.round(numberInRange(rawCodeRunner.max_output_chars, defaultCodeRunner.max_output_chars, 1_000, 50_000)),
       },
       vim_mode: Boolean(config.vim_mode),
       pinned_note_ids: parseStringArray(config.pinned_note_ids),

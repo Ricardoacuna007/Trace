@@ -5,6 +5,7 @@ import type {
   ImportSummary,
   MarkdownDbSnapshot,
   NoteSearchResult,
+  TraceCodeRunnerSettings,
   TraceEditorSettings,
   TraceGraphSettings,
   TraceLayoutConfig,
@@ -126,6 +127,7 @@ export interface UISlice {
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   traceEditorSettings: TraceEditorSettings
   traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
@@ -146,6 +148,7 @@ export interface UISlice {
     accent_color: string
     font_family: string
   }>) => Promise<void>
+  updateTraceCodeRunnerSettings: (patch: Partial<TraceCodeRunnerSettings>) => Promise<void>
   updateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => Promise<void>
   updateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => Promise<void>
   updateTraceLayout: (layout: TraceLayoutConfig) => Promise<void>

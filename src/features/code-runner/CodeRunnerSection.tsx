@@ -1,11 +1,13 @@
 import { AlertTriangle, Check, Loader2, Play, Terminal } from 'lucide-react'
 import { useMemo } from 'react'
+import type { TraceCodeRunnerSettings } from '../../lib/db'
 import { extractCodeBlocks } from './codeBlocks'
 import type { CodeOutput } from './useCodeRunner'
 import { useCodeRunner } from './useCodeRunner'
 
 interface CodeRunnerSectionProps {
   content: string
+  settings: TraceCodeRunnerSettings
 }
 
 function outputLabel(output: CodeOutput): string {
@@ -18,9 +20,9 @@ function outputLabel(output: CodeOutput): string {
   return `salida ${output.status ?? 'sin codigo'} en ${output.durationMs}ms`
 }
 
-export function CodeRunnerSection({ content }: CodeRunnerSectionProps) {
+export function CodeRunnerSection({ content, settings }: CodeRunnerSectionProps) {
   const snippets = useMemo(() => extractCodeBlocks(content), [content])
-  const runner = useCodeRunner()
+  const runner = useCodeRunner(settings)
 
   if (snippets.length === 0) {
     return <p className="text-[11px] text-[var(--t3)]">Sin bloques ejecutables.</p>

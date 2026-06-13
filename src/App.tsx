@@ -64,6 +64,7 @@ function DesktopApp() {
     traceTheme,
     traceAccentColor,
     traceFontFamily,
+    traceCodeRunnerSettings,
     traceEditorSettings,
     traceGraphSettings,
     traceLayout,
@@ -114,6 +115,7 @@ function DesktopApp() {
     toggleSidebar,
     togglePropertiesPanel,
     updateTraceAppearance,
+    updateTraceCodeRunnerSettings,
     updateTraceEditorSettings,
     updateTraceGraphSettings,
     updateTraceLayout,
@@ -406,6 +408,7 @@ function DesktopApp() {
         traceTheme={traceTheme}
         traceAccentColor={traceAccentColor}
         traceFontFamily={traceFontFamily}
+        traceCodeRunnerSettings={traceCodeRunnerSettings}
         traceEditorSettings={traceEditorSettings}
         traceGraphSettings={traceGraphSettings}
         traceLayout={traceLayout}
@@ -434,6 +437,7 @@ function DesktopApp() {
         onSetEditorWidth={(width) => void setEditorWidth(width)}
         onTitleChange={queueNoteTitleSave}
         onUpdateTraceAppearance={(patch) => void updateTraceAppearance(patch)}
+        onUpdateTraceCodeRunnerSettings={(patch) => void updateTraceCodeRunnerSettings(patch)}
         onUpdateTraceEditorSettings={(patch) => void updateTraceEditorSettings(patch)}
         onUpdateTraceGraphSettings={(patch) => void updateTraceGraphSettings(patch)}
         onUpdateTraceLayout={(layout) => void updateTraceLayout(layout)}

@@ -31,6 +31,10 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       show_labels: true,
       node_scale: 1,
     },
+    code_runner: {
+      timeout_ms: 30000,
+      max_output_chars: 10000,
+    },
     vim_mode: false,
     pinned_note_ids: [],
     layout: {
@@ -69,6 +73,10 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       graph: {
         ...fallback.graph,
         ...(parsed.graph ?? {}),
+      },
+      code_runner: {
+        ...fallback.code_runner,
+        ...(parsed.code_runner ?? {}),
       },
       layout: {
         ...fallback.layout,

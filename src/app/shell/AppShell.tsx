@@ -4,6 +4,7 @@ import type { NoteGraphData } from '../../features/notes-graph/graph'
 import type {
   MarkdownDbSnapshot,
   NoteBacklink,
+  TraceCodeRunnerSettings,
   TraceEditorSettings,
   TraceGraphSettings,
   TraceLayoutConfig,
@@ -67,6 +68,7 @@ interface AppShellProps {
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   traceEditorSettings: TraceEditorSettings
   traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
@@ -102,6 +104,7 @@ interface AppShellProps {
     accent_color: string
     font_family: string
   }>) => void
+  onUpdateTraceCodeRunnerSettings: (patch: Partial<TraceCodeRunnerSettings>) => void
   onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
   onUpdateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
@@ -175,6 +178,7 @@ export function AppShell({
   traceTheme,
   traceAccentColor,
   traceFontFamily,
+  traceCodeRunnerSettings,
   traceEditorSettings,
   traceGraphSettings,
   traceLayout,
@@ -206,6 +210,7 @@ export function AppShell({
   onSetEditorWidth,
   onTitleChange,
   onUpdateTraceAppearance,
+  onUpdateTraceCodeRunnerSettings,
   onUpdateTraceEditorSettings,
   onUpdateTraceGraphSettings,
   onUpdateTraceLayout,
@@ -263,6 +268,7 @@ export function AppShell({
                 traceTheme={traceTheme}
                 traceAccentColor={traceAccentColor}
                 traceFontFamily={traceFontFamily}
+                traceCodeRunnerSettings={traceCodeRunnerSettings}
                 traceEditorSettings={traceEditorSettings}
                 traceGraphSettings={traceGraphSettings}
                 traceLayout={traceLayout}
@@ -285,6 +291,7 @@ export function AppShell({
                 onReloadWorkspace={onReloadWorkspace}
                 onSetEditorWidth={onSetEditorWidth}
                 onUpdateTraceAppearance={onUpdateTraceAppearance}
+                onUpdateTraceCodeRunnerSettings={onUpdateTraceCodeRunnerSettings}
                 onUpdateTraceEditorSettings={onUpdateTraceEditorSettings}
                 onUpdateTraceGraphSettings={onUpdateTraceGraphSettings}
                 onUpdateTraceLayout={onUpdateTraceLayout}
@@ -347,6 +354,7 @@ export function AppShell({
                 note={selectedNote}
                 noteRelations={noteRelations}
                 recentConnectionIds={recentConnectionIds}
+                traceCodeRunnerSettings={traceCodeRunnerSettings}
                 editorWidth={editorWidth}
                 rightPanelMode={traceLayout.right_panel}
                 showBacklinks={uiModules.show_backlinks && isBacklinksPanelOpen}

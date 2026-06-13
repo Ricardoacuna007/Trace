@@ -80,6 +80,11 @@ export interface TraceGraphSettings {
   node_scale: number
 }
 
+export interface TraceCodeRunnerSettings {
+  timeout_ms: number
+  max_output_chars: number
+}
+
 export interface TraceConfig {
   theme: 'dark' | 'light'
   accent_color: string
@@ -87,6 +92,7 @@ export interface TraceConfig {
   editor_width: 'full' | 'centered' | string
   editor: TraceEditorSettings
   graph: TraceGraphSettings
+  code_runner: TraceCodeRunnerSettings
   vim_mode: boolean
   layout: TraceLayoutConfig
   ui_modules: TraceUIModules

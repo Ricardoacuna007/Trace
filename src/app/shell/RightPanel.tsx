@@ -10,7 +10,7 @@ import {
   formatDate,
   type BacklinkViewItem,
 } from '../../features/notes-editor/contentMetrics'
-import type { NoteBacklink } from '../../lib/db'
+import type { NoteBacklink, TraceCodeRunnerSettings } from '../../lib/db'
 import type { NoteRelation } from '../../store/types'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
@@ -22,6 +22,7 @@ interface RightPanelProps {
   note: Note
   noteRelations: NoteRelation[]
   recentConnectionIds: string[]
+  traceCodeRunnerSettings: TraceCodeRunnerSettings
   showBacklinks: boolean
   showProperties: boolean
   onConnectNotes: (sourceId: string, targetIds: string[]) => void
@@ -234,6 +235,7 @@ export function RightPanel({
   note,
   noteRelations,
   recentConnectionIds,
+  traceCodeRunnerSettings,
   showBacklinks,
   showProperties,
   onConnectNotes,
@@ -359,7 +361,7 @@ export function RightPanel({
       ) : null}
 
       <Section title="Codigo ejecutable">
-        <CodeRunnerSection content={note.content} />
+        <CodeRunnerSection content={note.content} settings={traceCodeRunnerSettings} />
       </Section>
 
       <Section title="Grafo local">

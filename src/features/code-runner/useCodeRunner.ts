@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { isTauri } from '../../lib/env'
+import type { TraceCodeRunnerSettings } from '../../lib/db'
 import type { CodeBlockSnippet } from './codeBlocks'
 
 export interface RuntimeInfo {
@@ -28,6 +29,10 @@ interface CodeRunnerState {
 }
 
 const TRUST_KEY = 'trace-code-runner-confirmed'
+const DEFAULT_CODE_RUNNER_SETTINGS: TraceCodeRunnerSettings = {
+  timeout_ms: 30_000,
+  max_output_chars: 10_000,
+}
 
 const LANGUAGE_ALIASES = new Map<string, string>([
   ['js', 'javascript'],
@@ -76,7 +81,7 @@ function confirmExecution(): boolean {
   return accepted
 }
 
-export function useCodeRunner(): CodeRunnerState {
+export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_RUNNER_SETTINGS): CodeRunnerState {
   const [runtimes, setRuntimes] = useState<RuntimeInfo[]>([])
   const [results, setResults] = useState<Record<string, CodeOutput>>({})
   const [runningBlockId, setRunningBlockId] = useState<string | null>(null)
@@ -161,7 +166,8 @@ export function useCodeRunner(): CodeRunnerState {
       const output = await invoke<CodeOutput>('run_code_block', {
         language: block.language,
         code: block.code,
-        timeoutMs: 30_000,
+        timeoutMs: settings.timeout_ms,
+        maxOutputChars: settings.max_output_chars,
       })
       setResults((current) => ({
         ...current,
@@ -182,7 +188,7 @@ export function useCodeRunner(): CodeRunnerState {
     } finally {
       setRunningBlockId(null)
     }
-  }, [canRun, isDesktop])
+  }, [canRun, isDesktop, settings.max_output_chars, settings.timeout_ms])
 
   return {
     canRun,

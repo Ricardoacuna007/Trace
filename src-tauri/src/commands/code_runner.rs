@@ -12,6 +12,8 @@ use std::{
 
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const MAX_OUTPUT_CHARS: usize = 10_000;
+const MIN_OUTPUT_CHARS: usize = 1_000;
+const HARD_MAX_OUTPUT_CHARS: usize = 50_000;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,6 +113,7 @@ pub fn run_code_block(
     language: String,
     code: String,
     timeout_ms: Option<u64>,
+    max_output_chars: Option<usize>,
 ) -> Result<CodeOutput, String> {
     let runtime = runtime_for_language(&language)
         .ok_or_else(|| format!("No hay runtime configurado para '{language}'."))?;
@@ -125,10 +128,13 @@ pub fn run_code_block(
     }
 
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).max(500));
+    let output_limit = max_output_chars
+        .unwrap_or(MAX_OUTPUT_CHARS)
+        .clamp(MIN_OUTPUT_CHARS, HARD_MAX_OUTPUT_CHARS);
     match runtime.kind {
-        RuntimeKind::File => run_file_runtime(runtime, &command_path, &code, timeout),
-        RuntimeKind::Shell => run_shell_runtime(runtime, &command_path, &code, timeout),
-        RuntimeKind::Rust => run_rust_runtime(runtime, &command_path, &code, timeout),
+        RuntimeKind::File => run_file_runtime(runtime, &command_path, &code, timeout, output_limit),
+        RuntimeKind::Shell => run_shell_runtime(runtime, &command_path, &code, timeout, output_limit),
+        RuntimeKind::Rust => run_rust_runtime(runtime, &command_path, &code, timeout, output_limit),
     }
 }
 
@@ -144,11 +150,12 @@ fn run_file_runtime(
     command_path: &Path,
     code: &str,
     timeout: Duration,
+    output_limit: usize,
 ) -> Result<CodeOutput, String> {
     let script_path = write_temp_file(runtime.extension, code)?;
     let mut command = Command::new(command_path);
     command.arg(&script_path);
-    let output = run_with_timeout(command, timeout);
+    let output = run_with_timeout(command, timeout, output_limit);
     let _ = fs::remove_file(script_path);
     output
 }
@@ -158,6 +165,7 @@ fn run_shell_runtime(
     command_path: &Path,
     code: &str,
     timeout: Duration,
+    output_limit: usize,
 ) -> Result<CodeOutput, String> {
     let mut command = Command::new(command_path);
     if runtime.language == "powershell" {
@@ -165,7 +173,7 @@ fn run_shell_runtime(
     } else {
         command.args(["-c", code]);
     }
-    run_with_timeout(command, timeout)
+    run_with_timeout(command, timeout, output_limit)
 }
 
 fn run_rust_runtime(
@@ -173,26 +181,31 @@ fn run_rust_runtime(
     command_path: &Path,
     code: &str,
     timeout: Duration,
+    output_limit: usize,
 ) -> Result<CodeOutput, String> {
     let source_path = write_temp_file(runtime.extension, code)?;
     let binary_path = source_path.with_extension(if cfg!(windows) { "exe" } else { "bin" });
 
     let mut compile = Command::new(command_path);
     compile.arg(&source_path).arg("-o").arg(&binary_path);
-    let compile_output = run_with_timeout(compile, timeout)?;
+    let compile_output = run_with_timeout(compile, timeout, output_limit)?;
     if compile_output.timed_out || compile_output.status != Some(0) {
         let _ = fs::remove_file(source_path);
         let _ = fs::remove_file(binary_path);
         return Ok(compile_output);
     }
 
-    let output = run_with_timeout(Command::new(&binary_path), timeout);
+    let output = run_with_timeout(Command::new(&binary_path), timeout, output_limit);
     let _ = fs::remove_file(source_path);
     let _ = fs::remove_file(binary_path);
     output
 }
 
-fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<CodeOutput, String> {
+fn run_with_timeout(
+    mut command: Command,
+    timeout: Duration,
+    output_limit: usize,
+) -> Result<CodeOutput, String> {
     let start = Instant::now();
     let mut child = command
         .stdin(Stdio::null())
@@ -225,8 +238,8 @@ fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<CodeOutpu
         .map_err(|error| format!("No se pudo leer la salida del proceso: {error}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let (stdout, stdout_truncated) = truncate_output(stdout);
-    let (stderr, stderr_truncated) = truncate_output(stderr);
+    let (stdout, stdout_truncated) = truncate_output(stdout, output_limit);
+    let (stderr, stderr_truncated) = truncate_output(stderr, output_limit);
 
     Ok(CodeOutput {
         stdout,
@@ -238,12 +251,12 @@ fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<CodeOutpu
     })
 }
 
-fn truncate_output(value: String) -> (String, bool) {
-    if value.chars().count() <= MAX_OUTPUT_CHARS {
+fn truncate_output(value: String, output_limit: usize) -> (String, bool) {
+    if value.chars().count() <= output_limit {
         return (value, false);
     }
 
-    let truncated = value.chars().take(MAX_OUTPUT_CHARS).collect::<String>();
+    let truncated = value.chars().take(output_limit).collect::<String>();
     (format!("{truncated}\n[trace: salida truncada]"), true)
 }
 
@@ -310,7 +323,7 @@ mod tests {
     #[test]
     fn truncates_long_output() {
         let value = "x".repeat(MAX_OUTPUT_CHARS + 10);
-        let (output, truncated) = truncate_output(value);
+        let (output, truncated) = truncate_output(value, MAX_OUTPUT_CHARS);
 
         assert!(truncated);
         assert!(output.ends_with("[trace: salida truncada]"));
