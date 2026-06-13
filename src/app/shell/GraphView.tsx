@@ -13,6 +13,7 @@ interface GraphViewProps {
   workspaceNodes: AppNode[]
   selectedNoteId: string | null
   onOpenNote: (noteId: string) => void
+  onUpdateGraphSettings: (patch: Partial<TraceGraphSettings>) => void
 }
 
 interface GraphNodeDatum extends d3.SimulationNodeDatum, NoteGraphNode {
@@ -130,13 +131,25 @@ function clusterHullPath(cluster: GraphCluster, nodeByGraphId: Map<string, Graph
   return `M${hull.map((point) => point.join(',')).join('L')}Z`
 }
 
-export function GraphView({ graph, graphSettings, workspaceNodes, selectedNoteId, onOpenNote }: GraphViewProps) {
+export function GraphView({
+  graph,
+  graphSettings,
+  workspaceNodes,
+  selectedNoteId,
+  onOpenNote,
+  onUpdateGraphSettings,
+}: GraphViewProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null)
   const clusters = useMemo(
-    () => buildGraphClusters(graph, workspaceNodes, graphSettings.cluster_colors),
-    [graph, graphSettings.cluster_colors, workspaceNodes],
+    () => buildGraphClusters(
+      graph,
+      workspaceNodes,
+      graphSettings.cluster_colors,
+      graphSettings.cluster_labels,
+    ),
+    [graph, graphSettings.cluster_colors, graphSettings.cluster_labels, workspaceNodes],
   )
   const selectedCluster = clusters.find((cluster) => cluster.id === selectedClusterId) ?? null
   const clusterColorByNoteId = useMemo(() => {
@@ -372,8 +385,18 @@ export function GraphView({ graph, graphSettings, workspaceNodes, selectedNoteId
         ) : null}
         {selectedCluster ? (
           <ClusterPanel
+            key={selectedCluster.id}
             cluster={selectedCluster}
             onClose={() => setSelectedClusterId(null)}
+            onRenameCluster={(label) => {
+              const nextLabels = { ...graphSettings.cluster_labels }
+              if (label) {
+                nextLabels[selectedCluster.labelKey] = label
+              } else {
+                delete nextLabels[selectedCluster.labelKey]
+              }
+              onUpdateGraphSettings({ cluster_labels: nextLabels })
+            }}
             onOpenNote={(noteId) => {
               setSelectedClusterId(null)
               onOpenNote(noteId)

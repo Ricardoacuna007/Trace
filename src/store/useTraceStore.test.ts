@@ -28,6 +28,7 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       orphan_color: '#f87171',
       bridge_color: '#f59e0b',
       cluster_colors: ['#5e8bff', '#4ade80', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee'],
+      cluster_labels: {},
       show_labels: true,
       node_scale: 1,
     },

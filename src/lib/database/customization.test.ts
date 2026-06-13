@@ -74,6 +74,11 @@ describe('parseTraceConfig', () => {
         orphan_color: '#111111',
         bridge_color: 'not-a-color',
         cluster_colors: ['#222222', '#333333', 'bad', '#444444', '#555555', '#666666', '#777777'],
+        cluster_labels: {
+          'note-a|note-b': ' Arquitectura ',
+          empty: '',
+          long: 'x'.repeat(80),
+        },
         show_labels: false,
         node_scale: 99,
       },
@@ -83,6 +88,10 @@ describe('parseTraceConfig', () => {
       orphan_color: '#111111',
       bridge_color: '#f59e0b',
       cluster_colors: ['#222222', '#333333', '#444444', '#555555', '#666666', '#777777'],
+      cluster_labels: {
+        'note-a|note-b': 'Arquitectura',
+        long: 'x'.repeat(64),
+      },
       show_labels: false,
       node_scale: 1.5,
     })

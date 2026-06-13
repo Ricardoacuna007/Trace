@@ -315,6 +315,7 @@ export function AppShell({
                 workspaceNodes={nodes}
                 selectedNoteId={selectedNote?.id ?? null}
                 onOpenNote={onOpenNodeFromGraph}
+                onUpdateGraphSettings={onUpdateTraceGraphSettings}
               />
             </Suspense>
           ) : activeView === 'workspace' || !selectedNote ? (

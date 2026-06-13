@@ -54,6 +54,24 @@ function parseColorArray(value: unknown, fallback: string[], maxItems: number): 
   return colors.length > 0 ? colors : fallback
 }
 
+function parseStringRecord(value: unknown, maxEntries: number): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter((entry): entry is [string, string] => (
+        typeof entry[0] === 'string'
+        && entry[0].trim().length > 0
+        && typeof entry[1] === 'string'
+        && entry[1].trim().length > 0
+      ))
+      .slice(0, maxEntries)
+      .map(([key, label]) => [key.trim(), label.trim().slice(0, 64)]),
+  )
+}
+
 export function parseTraceConfig(configJson: string): TraceConfig {
   const defaultUiModules: TraceUIModules = {
     show_breadcrumbs: true,
@@ -84,6 +102,7 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     orphan_color: '#f87171',
     bridge_color: '#f59e0b',
     cluster_colors: ['#5e8bff', '#4ade80', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee'],
+    cluster_labels: {},
     show_labels: true,
     node_scale: 1,
   }
@@ -154,6 +173,7 @@ export function parseTraceConfig(configJson: string): TraceConfig {
         orphan_color: parseColor(rawGraph.orphan_color, defaultGraph.orphan_color),
         bridge_color: parseColor(rawGraph.bridge_color, defaultGraph.bridge_color),
         cluster_colors: parseColorArray(rawGraph.cluster_colors, defaultGraph.cluster_colors, 6),
+        cluster_labels: parseStringRecord(rawGraph.cluster_labels, 100),
         show_labels: Boolean(rawGraph.show_labels ?? defaultGraph.show_labels),
         node_scale: numberInRange(rawGraph.node_scale, defaultGraph.node_scale, 0.75, 1.5),
       },

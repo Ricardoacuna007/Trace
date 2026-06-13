@@ -76,6 +76,7 @@ export interface TraceGraphSettings {
   orphan_color: string
   bridge_color: string
   cluster_colors: string[]
+  cluster_labels: Record<string, string>
   show_labels: boolean
   node_scale: number
 }

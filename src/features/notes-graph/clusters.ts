@@ -11,6 +11,7 @@ export interface GraphClusterNote {
 export interface GraphCluster {
   id: string
   label: string
+  labelKey: string
   color: string
   noteIds: string[]
   graphNodeIds: string[]
@@ -93,6 +94,7 @@ export function buildGraphClusters(
   graph: NoteGraphData,
   workspaceNodes: AppNode[],
   colors: string[] = CLUSTER_COLORS,
+  labels: Record<string, string> = {},
 ): GraphCluster[] {
   const palette = colors.length > 0 ? colors : CLUSTER_COLORS
   const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node]))
@@ -159,9 +161,12 @@ export function buildGraphClusters(
     })
 
     const index = clusters.length
+    const labelKey = sortedNoteIds.join('|')
+    const customLabel = labels[labelKey]?.trim()
     clusters.push({
-      id: `cluster-${index}-${sortedNoteIds.join('-')}`,
-      label: inferClusterLabel(notes),
+      id: `cluster-${labelKey}`,
+      label: customLabel || inferClusterLabel(notes),
+      labelKey,
       color: palette[index % palette.length],
       noteIds: sortedNoteIds,
       graphNodeIds: sortedNoteIds
