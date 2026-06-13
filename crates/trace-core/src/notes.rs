@@ -169,6 +169,57 @@ pub fn list_relations(connection: &Connection) -> Result<Vec<NoteRelation>, rusq
     rows.collect()
 }
 
+pub fn list_ignored_suggestions(
+    connection: &Connection,
+) -> Result<Vec<NoteRelation>, rusqlite::Error> {
+    let mut statement = connection.prepare(
+        "SELECT source_id, target_id
+         FROM ignored_suggestions
+         ORDER BY source_id, target_id",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok(NoteRelation {
+            source_id: row.get(0)?,
+            target_id: row.get(1)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn ignore_suggestion(
+    connection: &mut Connection,
+    source_id: &str,
+    target_id: &str,
+) -> Result<Vec<NoteRelation>, rusqlite::Error> {
+    let source_id = source_id.trim();
+    let target_id = target_id.trim();
+    if source_id.is_empty() || target_id.is_empty() || source_id == target_id {
+        return Ok(Vec::new());
+    }
+
+    let tx = connection.transaction()?;
+    tx.execute(
+        "INSERT OR IGNORE INTO ignored_suggestions (source_id, target_id) VALUES (?1, ?2)",
+        params![source_id, target_id],
+    )?;
+    tx.execute(
+        "INSERT OR IGNORE INTO ignored_suggestions (source_id, target_id) VALUES (?1, ?2)",
+        params![target_id, source_id],
+    )?;
+    tx.commit()?;
+
+    Ok(vec![
+        NoteRelation {
+            source_id: source_id.to_string(),
+            target_id: target_id.to_string(),
+        },
+        NoteRelation {
+            source_id: target_id.to_string(),
+            target_id: source_id.to_string(),
+        },
+    ])
+}
+
 pub fn connect_notes(
     connection: &mut Connection,
     source_id: &str,
@@ -415,6 +466,16 @@ mod tests {
             list_relations(&connection)
                 .expect("relations list")
                 .is_empty()
+        );
+
+        let ignored = ignore_suggestion(&mut connection, &updated.id, &target.id)
+            .expect("ignored suggestion inserts");
+        assert_eq!(ignored.len(), 2);
+        assert_eq!(
+            list_ignored_suggestions(&connection)
+                .expect("ignored suggestions list")
+                .len(),
+            2
         );
 
         assert!(delete_note(&connection, &note.id).expect("delete succeeds"));

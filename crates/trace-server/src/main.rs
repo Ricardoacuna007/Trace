@@ -143,6 +143,13 @@ struct DisconnectNotesRequest {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IgnoreSuggestionRequest {
+    source_id: String,
+    target_id: String,
+}
+
+#[derive(Deserialize)]
 struct AuditLogQuery {
     limit: Option<u32>,
     offset: Option<u32>,
@@ -210,6 +217,8 @@ fn build_router(state: AppState) -> Router {
         .route("/api/relations", get(api_list_relations))
         .route("/api/relations/connect", post(api_connect_notes))
         .route("/api/relations/disconnect", post(api_disconnect_notes))
+        .route("/api/suggestions/ignored", get(api_list_ignored_suggestions))
+        .route("/api/suggestions/ignore", post(api_ignore_suggestion))
         .route("/api/graph", get(api_graph))
         .route("/api/backup", post(api_backup))
         .route("/api/backup/history", get(api_backup_history))
@@ -640,6 +649,29 @@ async fn api_disconnect_notes(
     match open_connection(&state.db_path).and_then(|mut connection| {
         notes::disconnect_notes(&mut connection, &payload.source_id, &payload.target_id)
             .context("No se pudieron desconectar notas")
+    }) {
+        Ok(relations) => Json(relations).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_list_ignored_suggestions(State(state): State<AppState>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::list_ignored_suggestions(&connection)
+            .context("No se pudieron listar sugerencias ignoradas")
+    }) {
+        Ok(relations) => Json(relations).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_ignore_suggestion(
+    State(state): State<AppState>,
+    Json(payload): Json<IgnoreSuggestionRequest>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|mut connection| {
+        notes::ignore_suggestion(&mut connection, &payload.source_id, &payload.target_id)
+            .context("No se pudo ignorar sugerencia")
     }) {
         Ok(relations) => Json(relations).into_response(),
         Err(error) => server_error(error),

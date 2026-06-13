@@ -109,6 +109,7 @@ export function WebApp() {
   })
   const [nodes, setNodes] = useState<AppNode[]>([])
   const [relations, setRelations] = useState<NoteRelation[]>([])
+  const [ignoredSuggestionPairs, setIgnoredSuggestionPairs] = useState<string[]>([])
   const [graphData, setGraphData] = useState<NoteGraphData>(EMPTY_GRAPH)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<AppViewMode>('workspace')
@@ -146,8 +147,10 @@ export function WebApp() {
         apiJson<NoteRelation[]>('/api/relations'),
         apiJson<NoteGraphData>('/api/graph'),
       ])
+      const nextIgnored = await apiJson<NoteRelation[]>('/api/suggestions/ignored').catch(() => [])
       setNodes(nextNotes)
       setRelations(nextRelations)
+      setIgnoredSuggestionPairs(nextIgnored.map(relationKey))
       setGraphData(nextGraph)
       setSelectedNodeId((current) => (
         current && nextNotes.some((note) => note.id === current)
@@ -339,6 +342,23 @@ export function WebApp() {
     }
   }, [])
 
+  const ignoreConnectionSuggestion = useCallback(async (sourceId: string, targetId: string) => {
+    try {
+      const ignored = await apiJson<NoteRelation[]>('/api/suggestions/ignore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId, targetId }),
+      })
+      setIgnoredSuggestionPairs((current) => Array.from(new Set([
+        ...current,
+        ...ignored.map(relationKey),
+      ])))
+      setMessage('Sugerencia ignorada')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo ignorar sugerencia')
+    }
+  }, [])
+
   const updateSelectedNote = useCallback((updater: (note: Note) => Note) => {
     const currentNote = selectedNote
     if (!currentNote) {
@@ -414,6 +434,7 @@ export function WebApp() {
     clearAccessToken()
     setNodes([])
     setRelations([])
+    setIgnoredSuggestionPairs([])
     setSelectedNodeId(null)
     setMode('login')
     navigate('/')
@@ -549,7 +570,7 @@ export function WebApp() {
         editorWidth="centered"
         graphData={graphData}
         hasPendingChanges={saveStatus === 'saving'}
-        ignoredSuggestionPairs={[]}
+        ignoredSuggestionPairs={ignoredSuggestionPairs}
         isBacklinksPanelOpen
         ioMessage={message}
         ioWorking={busy}
@@ -580,7 +601,7 @@ export function WebApp() {
         onContentChange={handleContentChange}
         onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
         onDisconnectNotes={(sourceId, targetId) => void disconnectNotes(sourceId, targetId)}
-        onIgnoreConnectionSuggestion={() => setMessage('Ignorar sugerencias desde web se agregara al flujo unificado.')}
+        onIgnoreConnectionSuggestion={(sourceId, targetId) => void ignoreConnectionSuggestion(sourceId, targetId)}
         onMoveNode={() => setMessage('Procesar bandeja desde web se agregara al flujo unificado.')}
         onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
         onCreateNote={() => void createNote()}
