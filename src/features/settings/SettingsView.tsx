@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { TraceLayoutConfig, TraceUIModules } from '../../lib/db'
+import type { TraceEditorSettings, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
 import { CustomizationEditors } from './components/CustomizationEditors'
@@ -22,6 +22,7 @@ interface SettingsViewProps {
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceEditorSettings: TraceEditorSettings
   traceLayout: TraceLayoutConfig
   editorWidth: 'full' | 'centered'
   uiModules: TraceUIModules
@@ -38,6 +39,7 @@ interface SettingsViewProps {
     accent_color: string
     font_family: string
   }>) => void
+  onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
 }
@@ -56,6 +58,7 @@ export function SettingsView({
   traceTheme,
   traceAccentColor,
   traceFontFamily,
+  traceEditorSettings,
   traceLayout,
   editorWidth,
   uiModules,
@@ -68,6 +71,7 @@ export function SettingsView({
   onReloadWorkspace,
   onSetEditorWidth,
   onUpdateTraceAppearance,
+  onUpdateTraceEditorSettings,
   onUpdateTraceLayout,
   onToggleModule,
 }: SettingsViewProps) {
@@ -117,10 +121,12 @@ export function SettingsView({
           traceTheme={traceTheme}
           traceAccentColor={traceAccentColor}
           traceFontFamily={traceFontFamily}
+          traceEditorSettings={traceEditorSettings}
           traceLayout={traceLayout}
           uiModules={uiModules}
           onSetEditorWidth={onSetEditorWidth}
           onUpdateTraceAppearance={onUpdateTraceAppearance}
+          onUpdateTraceEditorSettings={onUpdateTraceEditorSettings}
           onUpdateTraceLayout={onUpdateTraceLayout}
           onToggleModule={onToggleModule}
         />

@@ -49,4 +49,22 @@ describe('parseTraceConfig', () => {
       },
     })
   })
+
+  it('normalizes editor appearance settings', () => {
+    const config = parseTraceConfig(JSON.stringify({
+      editor: {
+        font_size: 99,
+        line_height: 0.5,
+        block_spacing: 14,
+        max_width: 1100,
+      },
+    }))
+
+    expect(config.editor).toEqual({
+      font_size: 20,
+      line_height: 1.35,
+      block_spacing: 14,
+      max_width: 1100,
+    })
+  })
 })

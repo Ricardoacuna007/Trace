@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react'
-import type { TraceLayoutConfig, TraceUIModules } from '../../../lib/db'
+import type { TraceEditorSettings, TraceLayoutConfig, TraceUIModules } from '../../../lib/db'
 
 interface UIModulesSectionProps {
   editorWidth: 'full' | 'centered'
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceEditorSettings: TraceEditorSettings
   traceLayout: TraceLayoutConfig
   uiModules: TraceUIModules
   onSetEditorWidth: (width: 'full' | 'centered') => void
@@ -14,6 +15,7 @@ interface UIModulesSectionProps {
     accent_color: string
     font_family: string
   }>) => void
+  onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
 }
@@ -40,10 +42,12 @@ export function UIModulesSection({
   traceTheme,
   traceAccentColor,
   traceFontFamily,
+  traceEditorSettings,
   traceLayout,
   uiModules,
   onSetEditorWidth,
   onUpdateTraceAppearance,
+  onUpdateTraceEditorSettings,
   onUpdateTraceLayout,
   onToggleModule,
 }: UIModulesSectionProps) {
@@ -163,6 +167,41 @@ export function UIModulesSection({
               ))}
             </select>
           </label>
+          <div className="mt-3 space-y-2.5">
+            <RangeField
+              label="Tamano"
+              max={20}
+              min={13}
+              suffix="px"
+              value={traceEditorSettings.font_size}
+              onChange={(value) => onUpdateTraceEditorSettings({ font_size: value })}
+            />
+            <RangeField
+              label="Ancho"
+              max={1280}
+              min={680}
+              step={20}
+              suffix="px"
+              value={traceEditorSettings.max_width}
+              onChange={(value) => onUpdateTraceEditorSettings({ max_width: value })}
+            />
+            <RangeField
+              label="Linea"
+              max={2.1}
+              min={1.35}
+              step={0.05}
+              value={traceEditorSettings.line_height}
+              onChange={(value) => onUpdateTraceEditorSettings({ line_height: value })}
+            />
+            <RangeField
+              label="Bloques"
+              max={20}
+              min={4}
+              suffix="px"
+              value={traceEditorSettings.block_spacing}
+              onChange={(value) => onUpdateTraceEditorSettings({ block_spacing: value })}
+            />
+          </div>
         </div>
 
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg3)] px-3 py-3">
@@ -253,6 +292,44 @@ function ToggleRow({
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
         className={toggleClassName}
+      />
+    </label>
+  )
+}
+
+function RangeField({
+  label,
+  max,
+  min,
+  onChange,
+  step = 1,
+  suffix = '',
+  value,
+}: {
+  label: string
+  max: number
+  min: number
+  onChange: (value: number) => void
+  step?: number
+  suffix?: string
+  value: number
+}) {
+  return (
+    <label className="block text-xs text-[var(--t2)]">
+      <span className="mb-1 flex items-center justify-between gap-2">
+        <span>{label}</span>
+        <span className="font-mono text-[10px] text-[var(--t3)]">
+          {Number.isInteger(value) ? value : value.toFixed(2)}{suffix}
+        </span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        className="w-full accent-[var(--accent)]"
+        onChange={(event) => onChange(Number(event.target.value))}
       />
     </label>
   )

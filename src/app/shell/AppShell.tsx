@@ -1,7 +1,7 @@
 ﻿import type { Block } from '@blocknote/core'
 import { Suspense, lazy } from 'react'
 import type { NoteGraphData } from '../../features/notes-graph/graph'
-import type { MarkdownDbSnapshot, NoteBacklink, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
+import type { MarkdownDbSnapshot, NoteBacklink, TraceEditorSettings, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../../store/types'
 import type { Note } from '../../types/note'
 import type { AppNode, TreeNode as WorkspaceTreeNode } from '../../types/workspace'
@@ -60,6 +60,7 @@ interface AppShellProps {
   traceTheme: 'dark' | 'light'
   traceAccentColor: string
   traceFontFamily: string
+  traceEditorSettings: TraceEditorSettings
   traceLayout: TraceLayoutConfig
   uiModules: TraceUIModules
   viewMode: ViewMode
@@ -93,6 +94,7 @@ interface AppShellProps {
     accent_color: string
     font_family: string
   }>) => void
+  onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
   onTogglePropertiesPanel: () => void
@@ -164,6 +166,7 @@ export function AppShell({
   traceTheme,
   traceAccentColor,
   traceFontFamily,
+  traceEditorSettings,
   traceLayout,
   uiModules,
   viewMode,
@@ -193,6 +196,7 @@ export function AppShell({
   onSetEditorWidth,
   onTitleChange,
   onUpdateTraceAppearance,
+  onUpdateTraceEditorSettings,
   onUpdateTraceLayout,
   onToggleModule,
   onTogglePropertiesPanel,
@@ -248,6 +252,7 @@ export function AppShell({
                 traceTheme={traceTheme}
                 traceAccentColor={traceAccentColor}
                 traceFontFamily={traceFontFamily}
+                traceEditorSettings={traceEditorSettings}
                 traceLayout={traceLayout}
                 configJson={traceConfigJson}
                 customCss={customCss}
@@ -268,6 +273,7 @@ export function AppShell({
                 onReloadWorkspace={onReloadWorkspace}
                 onSetEditorWidth={onSetEditorWidth}
                 onUpdateTraceAppearance={onUpdateTraceAppearance}
+                onUpdateTraceEditorSettings={onUpdateTraceEditorSettings}
                 onUpdateTraceLayout={onUpdateTraceLayout}
                 onToggleModule={onToggleModule}
               />

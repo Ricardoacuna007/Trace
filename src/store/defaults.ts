@@ -7,6 +7,12 @@ export const DEFAULT_TRACE_CONFIG_JSON = JSON.stringify(
     accent_color: '#5e8bff',
     font_family: 'DM Sans',
     editor_width: 'centered',
+    editor: {
+      font_size: 15,
+      line_height: 1.75,
+      block_spacing: 8,
+      max_width: 980,
+    },
     vim_mode: false,
     pinned_note_ids: [],
     layout: {

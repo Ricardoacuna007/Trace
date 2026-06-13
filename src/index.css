@@ -35,6 +35,9 @@
   --trace-muted: var(--t2);
   --trace-font-family: var(--font);
   --trace-editor-width: 980px;
+  --trace-editor-font-size: 15px;
+  --trace-editor-line-height: 1.75;
+  --trace-editor-block-spacing: 8px;
 
   font-family: var(--font);
   color-scheme: dark;
@@ -105,6 +108,10 @@ textarea {
   margin-inline: auto;
 }
 
+.trace-content-width[data-editor-width='full'] {
+  max-width: none;
+}
+
 .trace-scrollbar::-webkit-scrollbar {
   width: 7px;
 }
@@ -131,10 +138,22 @@ textarea {
   color: var(--t1);
   background: var(--bg);
   font-family: var(--font);
+  font-size: var(--trace-editor-font-size);
+  line-height: var(--trace-editor-line-height);
 }
 
 .trace-editor .bn-block-content {
   color: var(--t1);
+}
+
+.trace-editor .bn-block-outer + .bn-block-outer {
+  margin-top: var(--trace-editor-block-spacing);
+}
+
+@media (max-width: 767px) {
+  .trace-content-width {
+    max-width: none;
+  }
 }
 
 .wiki-link {

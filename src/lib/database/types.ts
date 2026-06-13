@@ -65,11 +65,19 @@ export interface TraceLayoutConfig {
   visible_elements: TraceVisibleElements
 }
 
+export interface TraceEditorSettings {
+  font_size: number
+  line_height: number
+  block_spacing: number
+  max_width: number
+}
+
 export interface TraceConfig {
   theme: 'dark' | 'light'
   accent_color: string
   font_family: string
   editor_width: 'full' | 'centered' | string
+  editor: TraceEditorSettings
   vim_mode: boolean
   layout: TraceLayoutConfig
   ui_modules: TraceUIModules

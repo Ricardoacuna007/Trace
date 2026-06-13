@@ -31,9 +31,6 @@ export function EditorWrapper({
     showWordCount ? `${words} palabras` : null,
     showWordCount ? `${minutes} min lectura` : null,
   ].filter((item): item is string => item !== null)
-  const contentWidthClassName = editorWidth === 'full'
-    ? 'w-full max-w-none'
-    : 'mx-auto w-full max-w-[820px]'
 
   useEffect(() => {
     const titleElement = titleRef.current
@@ -50,7 +47,7 @@ export function EditorWrapper({
 
   return (
     <section className="trace-scrollbar min-h-0 flex-1 overflow-y-auto bg-[var(--bg)] px-0 py-3 md:px-12">
-      <div className={`flex min-h-full flex-col ${contentWidthClassName}`}>
+      <div className="trace-content-width flex min-h-full flex-col" data-editor-width={editorWidth}>
         <textarea
           ref={titleRef}
           value={note.title}

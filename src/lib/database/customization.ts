@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauriRuntime } from './runtime'
 import type {
   TraceConfig,
+  TraceEditorSettings,
   TraceLayoutConfig,
   TraceRightPanelMode,
   TraceSidebarPosition,
@@ -21,6 +22,13 @@ function parseStringArray(value: unknown): string[] {
       .map((item) => item.trim())
       .filter((item) => item.length > 0),
   ))
+}
+
+function numberInRange(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+  return Math.min(max, Math.max(min, value))
 }
 
 export function parseTraceConfig(configJson: string): TraceConfig {
@@ -43,12 +51,19 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     right_panel: 'visible',
     visible_elements: defaultVisibleElements,
   }
+  const defaultEditor: TraceEditorSettings = {
+    font_size: 15,
+    line_height: 1.75,
+    block_spacing: 8,
+    max_width: 980,
+  }
 
   const fallback: TraceConfig = {
     theme: 'dark',
     accent_color: '#5e8bff',
     font_family: 'DM Sans',
     editor_width: 'centered',
+    editor: defaultEditor,
     vim_mode: false,
     layout: defaultLayout,
     ui_modules: defaultUiModules,
@@ -76,6 +91,9 @@ export function parseTraceConfig(configJson: string): TraceConfig {
       : {}
     const sidebarPosition = normalizeSidebarPosition(rawLayout.sidebar_position, defaultLayout.sidebar_position)
     const rightPanel = normalizeRightPanel(rawLayout.right_panel, defaultLayout.right_panel)
+    const rawEditor = config.editor && typeof config.editor === 'object'
+      ? config.editor as Record<string, unknown>
+      : {}
 
     return {
       ...fallback,
@@ -84,6 +102,12 @@ export function parseTraceConfig(configJson: string): TraceConfig {
       accent_color: typeof config.accent_color === 'string' ? config.accent_color : fallback.accent_color,
       font_family: typeof config.font_family === 'string' ? config.font_family : fallback.font_family,
       editor_width: editorWidth === 'full' ? 'full' : editorWidth === 'centered' ? 'centered' : editorWidth,
+      editor: {
+        font_size: numberInRange(rawEditor.font_size, defaultEditor.font_size, 13, 20),
+        line_height: numberInRange(rawEditor.line_height, defaultEditor.line_height, 1.35, 2.1),
+        block_spacing: numberInRange(rawEditor.block_spacing, defaultEditor.block_spacing, 4, 20),
+        max_width: numberInRange(rawEditor.max_width, defaultEditor.max_width, 680, 1280),
+      },
       vim_mode: Boolean(config.vim_mode),
       pinned_note_ids: parseStringArray(config.pinned_note_ids),
       layout: {

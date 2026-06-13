@@ -40,7 +40,7 @@ export function ThemeInjector({ configJson, customCss }: ThemeInjectorProps) {
     const widthToken = config.editor_width === 'full'
       ? 'none'
       : config.editor_width === 'centered'
-        ? '980px'
+        ? `${config.editor.max_width}px`
         : config.editor_width
 
     root.dataset.traceTheme = config.theme
@@ -59,13 +59,25 @@ export function ThemeInjector({ configJson, customCss }: ThemeInjectorProps) {
     root.style.setProperty('--font', configuredFont)
     root.style.setProperty('--trace-font-family', configuredFont)
     root.style.setProperty('--trace-editor-width', widthToken)
+    root.style.setProperty('--trace-editor-font-size', `${config.editor.font_size}px`)
+    root.style.setProperty('--trace-editor-line-height', String(config.editor.line_height))
+    root.style.setProperty('--trace-editor-block-spacing', `${config.editor.block_spacing}px`)
 
     if (config.theme === 'dark') {
       root.classList.add('dark')
     } else {
       root.classList.remove('dark')
     }
-  }, [config.accent_color, config.editor_width, config.font_family, config.theme])
+  }, [
+    config.accent_color,
+    config.editor.block_spacing,
+    config.editor.font_size,
+    config.editor.line_height,
+    config.editor.max_width,
+    config.editor_width,
+    config.font_family,
+    config.theme,
+  ])
 
   useEffect(() => {
     const styleId = 'trace-custom-css'

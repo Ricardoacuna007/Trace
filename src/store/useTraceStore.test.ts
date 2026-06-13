@@ -18,6 +18,12 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
     accent_color: '#5e8bff',
     font_family: 'DM Sans',
     editor_width: 'centered',
+    editor: {
+      font_size: 15,
+      line_height: 1.75,
+      block_spacing: 8,
+      max_width: 980,
+    },
     vim_mode: false,
     pinned_note_ids: [],
     layout: {
@@ -48,6 +54,10 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       ui_modules: {
         ...fallback.ui_modules,
         ...(parsed.ui_modules ?? {}),
+      },
+      editor: {
+        ...fallback.editor,
+        ...(parsed.editor ?? {}),
       },
       layout: {
         ...fallback.layout,
