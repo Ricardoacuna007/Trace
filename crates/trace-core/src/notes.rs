@@ -200,6 +200,46 @@ pub fn connect_notes(
     Ok(created)
 }
 
+pub fn disconnect_notes(
+    connection: &mut Connection,
+    source_id: &str,
+    target_id: &str,
+) -> Result<Vec<NoteRelation>, rusqlite::Error> {
+    let source_id = source_id.trim();
+    let target_id = target_id.trim();
+    if source_id.is_empty() || target_id.is_empty() || source_id == target_id {
+        return Ok(Vec::new());
+    }
+
+    let tx = connection.transaction()?;
+    let mut removed = Vec::new();
+
+    let affected_forward = tx.execute(
+        "DELETE FROM note_relations WHERE source_id = ?1 AND target_id = ?2",
+        params![source_id, target_id],
+    )?;
+    if affected_forward > 0 {
+        removed.push(NoteRelation {
+            source_id: source_id.to_string(),
+            target_id: target_id.to_string(),
+        });
+    }
+
+    let affected_reverse = tx.execute(
+        "DELETE FROM note_relations WHERE source_id = ?1 AND target_id = ?2",
+        params![target_id, source_id],
+    )?;
+    if affected_reverse > 0 {
+        removed.push(NoteRelation {
+            source_id: target_id.to_string(),
+            target_id: source_id.to_string(),
+        });
+    }
+
+    tx.commit()?;
+    Ok(removed)
+}
+
 fn map_node_row(row: &rusqlite::Row<'_>) -> Result<Node, rusqlite::Error> {
     let node_type_raw: String = row.get(2)?;
     let node_type = match node_type_raw.as_str() {
@@ -367,6 +407,15 @@ mod tests {
         )
         .expect("relations insert");
         assert_eq!(created.len(), 2);
+
+        let removed = disconnect_notes(&mut connection, &updated.id, &target.id)
+            .expect("relations delete");
+        assert_eq!(removed.len(), 2);
+        assert!(
+            list_relations(&connection)
+                .expect("relations list")
+                .is_empty()
+        );
 
         assert!(delete_note(&connection, &note.id).expect("delete succeeds"));
         assert!(get_note(&connection, &note.id)

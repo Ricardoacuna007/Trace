@@ -15,6 +15,7 @@ import { AppLoading } from './shell/AppLoading'
 import { AppShell } from './shell/AppShell'
 import { CommandPalette } from './shell/CommandPalette'
 import { ThemeInjector } from './shell/ThemeInjector'
+import { WebConnectNoteModal } from './WebConnectNoteModal'
 import { WebSettings } from './WebSettings'
 
 type AuthMode = 'loading' | 'setup' | 'login' | 'app'
@@ -78,6 +79,24 @@ function blocksToContent(blocks: Block[]): string {
   return JSON.stringify(blocks)
 }
 
+function relationKey(relation: NoteRelation): string {
+  return `${relation.sourceId}->${relation.targetId}`
+}
+
+function mergeRelations(current: NoteRelation[], incoming: NoteRelation[]): NoteRelation[] {
+  const seen = new Set<string>()
+  const merged: NoteRelation[] = []
+  for (const relation of [...current, ...incoming]) {
+    const key = relationKey(relation)
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    merged.push(relation)
+  }
+  return merged
+}
+
 export function WebApp() {
   const saveTimerRef = useRef<number | null>(null)
   const queuedNoteRef = useRef<Note | null>(null)
@@ -99,6 +118,7 @@ export function WebApp() {
   const [commandOpen, setCommandOpen] = useState(false)
   const [commandQuery, setCommandQuery] = useState('')
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(true)
+  const [webConnectOpen, setWebConnectOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -278,6 +298,44 @@ export function WebApp() {
       setMessage(error instanceof Error ? error.message : 'No se pudo crear nota')
     } finally {
       setBusy(false)
+    }
+  }, [])
+
+  const connectNotes = useCallback(async (sourceId: string, targetIds: string[]) => {
+    const targets = Array.from(new Set(targetIds.filter((targetId) => targetId && targetId !== sourceId)))
+    if (targets.length === 0) {
+      return
+    }
+
+    try {
+      const created = await apiJson<NoteRelation[]>('/api/relations/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId, targetIds: targets }),
+      })
+      setRelations((current) => mergeRelations(current, created))
+      const nextGraph = await apiJson<NoteGraphData>('/api/graph')
+      setGraphData(nextGraph)
+      setMessage(targets.length === 1 ? 'Nota conectada' : `${targets.length} notas conectadas`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudieron conectar notas')
+    }
+  }, [])
+
+  const disconnectNotes = useCallback(async (sourceId: string, targetId: string) => {
+    try {
+      const removed = await apiJson<NoteRelation[]>('/api/relations/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId, targetId }),
+      })
+      const removedKeys = new Set(removed.map(relationKey))
+      setRelations((current) => current.filter((relation) => !removedKeys.has(relationKey(relation))))
+      const nextGraph = await apiJson<NoteGraphData>('/api/graph')
+      setGraphData(nextGraph)
+      setMessage('Conexion eliminada')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo desconectar la nota')
     }
   }, [])
 
@@ -465,11 +523,21 @@ export function WebApp() {
           setActiveView(modeName)
           setViewMode(modeName)
         }}
-        onOpenConnect={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
+        onOpenConnect={() => setWebConnectOpen(true)}
         onOpenSettings={() => navigate('/settings')}
         onExportMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}
       />
       <AppErrorBanner error={message} />
+      {webConnectOpen ? (
+        <WebConnectNoteModal
+          activeNote={selectedNote}
+          notes={nodes}
+          noteRelations={relations}
+          open={webConnectOpen}
+          onClose={() => setWebConnectOpen(false)}
+          onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
+        />
+      ) : null}
       <AppShell
         activeVaultPath="Trace Web"
         activeView={activeView}
@@ -510,8 +578,8 @@ export function WebApp() {
         uiModules={DEFAULT_UI_MODULES}
         viewMode={viewMode}
         onContentChange={handleContentChange}
-        onConnectNotes={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
-        onDisconnectNotes={() => setMessage('Desconectar notas desde web se agregara al flujo unificado.')}
+        onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
+        onDisconnectNotes={(sourceId, targetId) => void disconnectNotes(sourceId, targetId)}
         onIgnoreConnectionSuggestion={() => setMessage('Ignorar sugerencias desde web se agregara al flujo unificado.')}
         onMoveNode={() => setMessage('Procesar bandeja desde web se agregara al flujo unificado.')}
         onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
@@ -520,7 +588,7 @@ export function WebApp() {
         onExportVaultMarkdown={() => setMessage('Exportar vault desde web se agregara despues.')}
         onImportMarkdown={() => setMessage('Importar Markdown desde web se agregara despues.')}
         onOpenCommandPalette={() => setCommandOpen(true)}
-        onOpenConnectModal={() => setMessage('Conectar notas desde web se agregara al flujo unificado.')}
+        onOpenConnectModal={() => setWebConnectOpen(true)}
         onOpenNode={selectNode}
         onOpenNodeFromGraph={selectNode}
         onOpenWikiLink={(title) => void openWikiLink(title)}
