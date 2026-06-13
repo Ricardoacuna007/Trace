@@ -23,6 +23,13 @@ pub struct CreateNoteInput {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateFolderInput {
+    pub title: Option<String>,
+    pub parent_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateNoteInput {
     pub title: Option<String>,
     pub content: Option<String>,
@@ -74,6 +81,18 @@ pub fn get_note(connection: &Connection, id: &str) -> Result<Option<Node>, rusql
         .optional()
 }
 
+pub fn get_node(connection: &Connection, id: &str) -> Result<Option<Node>, rusqlite::Error> {
+    connection
+        .query_row(
+            "SELECT id, title, type, parent_id, content, icon, tags, inbox, position, updated_at
+             FROM nodes
+             WHERE id = ?1",
+            [id],
+            map_node_row,
+        )
+        .optional()
+}
+
 pub fn create_note(
     connection: &Connection,
     input: CreateNoteInput,
@@ -103,6 +122,25 @@ pub fn create_note(
     )?;
 
     get_note(connection, &id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+}
+
+pub fn create_folder(
+    connection: &Connection,
+    input: CreateFolderInput,
+) -> Result<Node, rusqlite::Error> {
+    let id = format!("folder-{}", Uuid::new_v4());
+    let now = now_iso();
+    let parent_id = input.parent_id;
+    let position = next_position_for_parent(connection, parent_id.as_deref())?;
+    let title = normalize_title_with_default(input.title.as_deref(), "Nueva carpeta");
+
+    connection.execute(
+        "INSERT INTO nodes (id, title, type, parent_id, content, icon, tags, inbox, position, updated_at)
+         VALUES (?1, ?2, 'folder', ?3, NULL, 'folder', '[]', 0, ?4, ?5)",
+        params![id, title, parent_id, position, now],
+    )?;
+
+    get_node(connection, &id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
 }
 
 pub fn update_note(
@@ -336,9 +374,13 @@ fn next_position_for_parent(
 }
 
 fn normalize_title(title: Option<&str>) -> String {
+    normalize_title_with_default(title, DEFAULT_NOTE_TITLE)
+}
+
+fn normalize_title_with_default(title: Option<&str>, fallback: &str) -> String {
     let title = title.map(str::trim).unwrap_or_default();
     if title.is_empty() {
-        DEFAULT_NOTE_TITLE.to_string()
+        fallback.to_string()
     } else {
         title.to_string()
     }
@@ -419,6 +461,18 @@ mod tests {
         assert_eq!(note.node_type, NodeType::Note);
         assert_eq!(note.tags, vec!["rust", "trace"]);
         assert!(note.inbox);
+
+        let folder = create_folder(
+            &connection,
+            CreateFolderInput {
+                title: Some(" Projects ".to_string()),
+                parent_id: None,
+            },
+        )
+        .expect("folder is created");
+        assert_eq!(folder.title, "Projects");
+        assert_eq!(folder.node_type, NodeType::Folder);
+        assert_eq!(folder.icon.as_deref(), Some("folder"));
 
         let updated = update_note(
             &connection,

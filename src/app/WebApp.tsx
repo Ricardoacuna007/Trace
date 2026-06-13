@@ -143,7 +143,7 @@ export function WebApp() {
   const loadWorkspace = useCallback(async () => {
     try {
       const [nextNotes, nextRelations, nextGraph] = await Promise.all([
-        apiJson<AppNode[]>('/api/notes'),
+        apiJson<AppNode[]>('/api/nodes'),
         apiJson<NoteRelation[]>('/api/relations'),
         apiJson<NoteGraphData>('/api/graph'),
       ])
@@ -299,6 +299,26 @@ export function WebApp() {
       setMessage('Nota creada')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo crear nota')
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const createFolder = useCallback(async () => {
+    setBusy(true)
+    try {
+      const folder = await apiJson<AppNode>('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Nueva carpeta' }),
+      })
+      setNodes((current) => [folder, ...current])
+      setSelectedNodeId(folder.id)
+      setActiveView('workspace')
+      setViewMode('workspace')
+      setMessage('Carpeta creada')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo crear carpeta')
     } finally {
       setBusy(false)
     }
@@ -530,7 +550,7 @@ export function WebApp() {
         onOpenChange={setCommandOpen}
         onQueryChange={setCommandQuery}
         onOpenNote={selectNode}
-        onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
+        onCreateFolder={() => void createFolder()}
         onCreateNote={() => void createNote()}
         onSwitchView={(modeName) => {
           if (modeName === 'settings' || modeName === 'database') {
@@ -603,7 +623,7 @@ export function WebApp() {
         onDisconnectNotes={(sourceId, targetId) => void disconnectNotes(sourceId, targetId)}
         onIgnoreConnectionSuggestion={(sourceId, targetId) => void ignoreConnectionSuggestion(sourceId, targetId)}
         onMoveNode={() => setMessage('Procesar bandeja desde web se agregara al flujo unificado.')}
-        onCreateFolder={() => setMessage('Las carpetas web se agregaran en una version posterior.')}
+        onCreateFolder={() => void createFolder()}
         onCreateNote={() => void createNote()}
         onExportCurrentNoteMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}
         onExportVaultMarkdown={() => setMessage('Exportar vault desde web se agregara despues.')}

@@ -36,7 +36,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use trace_core::{
     auth::Claims,
     graph,
-    notes::{self, CreateNoteInput, DeletedResponse, UpdateNoteInput},
+    notes::{self, CreateFolderInput, CreateNoteInput, DeletedResponse, UpdateNoteInput},
     schema,
 };
 use uuid::Uuid;
@@ -207,7 +207,9 @@ async fn main() -> Result<()> {
 
 fn build_router(state: AppState) -> Router {
     let protected_api = Router::new()
+        .route("/api/nodes", get(api_list_nodes))
         .route("/api/notes", get(api_list_notes).post(api_create_note))
+        .route("/api/folders", post(api_create_folder))
         .route(
             "/api/notes/:id",
             get(api_get_note)
@@ -574,6 +576,15 @@ async fn api_list_notes(State(state): State<AppState>) -> Response {
     }
 }
 
+async fn api_list_nodes(State(state): State<AppState>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::list_nodes(&connection).context("No se pudieron listar nodos")
+    }) {
+        Ok(nodes) => Json(nodes).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
 async fn api_get_note(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     match open_connection(&state.db_path)
         .and_then(|connection| notes::get_note(&connection, &id).context("No se pudo leer nota"))
@@ -592,6 +603,18 @@ async fn api_create_note(
         notes::create_note(&connection, payload).context("No se pudo crear nota")
     }) {
         Ok(note) => (StatusCode::CREATED, Json(note)).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_create_folder(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateFolderInput>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::create_folder(&connection, payload).context("No se pudo crear carpeta")
+    }) {
+        Ok(folder) => (StatusCode::CREATED, Json(folder)).into_response(),
         Err(error) => server_error(error),
     }
 }
