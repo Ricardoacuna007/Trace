@@ -62,6 +62,9 @@ export function ThemeInjector({ configJson, customCss }: ThemeInjectorProps) {
     root.style.setProperty('--trace-editor-font-size', `${config.editor.font_size}px`)
     root.style.setProperty('--trace-editor-line-height', String(config.editor.line_height))
     root.style.setProperty('--trace-editor-block-spacing', `${config.editor.block_spacing}px`)
+    root.style.setProperty('--trace-graph-orphan', config.graph.orphan_color)
+    root.style.setProperty('--trace-graph-bridge', config.graph.bridge_color)
+    root.style.setProperty('--trace-graph-node-scale', String(config.graph.node_scale))
 
     if (config.theme === 'dark') {
       root.classList.add('dark')
@@ -76,6 +79,9 @@ export function ThemeInjector({ configJson, customCss }: ThemeInjectorProps) {
     config.editor.max_width,
     config.editor_width,
     config.font_family,
+    config.graph.bridge_color,
+    config.graph.node_scale,
+    config.graph.orphan_color,
     config.theme,
   ])
 

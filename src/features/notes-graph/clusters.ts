@@ -89,7 +89,12 @@ function inferClusterLabel(notes: GraphClusterNote[]): string {
   return notes[0]?.title ?? 'Cluster'
 }
 
-export function buildGraphClusters(graph: NoteGraphData, workspaceNodes: AppNode[]): GraphCluster[] {
+export function buildGraphClusters(
+  graph: NoteGraphData,
+  workspaceNodes: AppNode[],
+  colors: string[] = CLUSTER_COLORS,
+): GraphCluster[] {
+  const palette = colors.length > 0 ? colors : CLUSTER_COLORS
   const graphNodeById = new Map(graph.nodes.map((node) => [node.id, node]))
   const graphNodeIdByNoteId = new Map(graph.nodes.map((node) => [node.noteId, node.id]))
   const noteById = new Map(workspaceNodes
@@ -157,7 +162,7 @@ export function buildGraphClusters(graph: NoteGraphData, workspaceNodes: AppNode
     clusters.push({
       id: `cluster-${index}-${sortedNoteIds.join('-')}`,
       label: inferClusterLabel(notes),
-      color: CLUSTER_COLORS[index % CLUSTER_COLORS.length],
+      color: palette[index % palette.length],
       noteIds: sortedNoteIds,
       graphNodeIds: sortedNoteIds
         .map((noteId) => graphNodeIdByNoteId.get(noteId))

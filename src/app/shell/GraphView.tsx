@@ -4,10 +4,12 @@ import { ClusterPanel } from '../../features/notes-graph/ClusterPanel'
 import { buildGraphClusters, type GraphCluster } from '../../features/notes-graph/clusters'
 import type { NoteGraphData, NoteGraphNode } from '../../features/notes-graph/graph'
 import { buildGraphNodeVisuals, type GraphNodeVisual } from '../../features/notes-graph/visuals'
+import type { TraceGraphSettings } from '../../lib/db'
 import type { AppNode } from '../../types/workspace'
 
 interface GraphViewProps {
   graph: NoteGraphData
+  graphSettings: TraceGraphSettings
   workspaceNodes: AppNode[]
   selectedNoteId: string | null
   onOpenNote: (noteId: string) => void
@@ -27,8 +29,8 @@ interface GraphLinkDatum extends d3.SimulationLinkDatum<GraphNodeDatum> {
   weight: number
 }
 
-function radiusFromDegree(degree: number): number {
-  return Math.max(8, Math.min(22, 8 + degree * 2.2))
+function radiusFromDegree(degree: number, scale: number): number {
+  return Math.max(8, Math.min(22, 8 + degree * 2.2)) * scale
 }
 
 function cssVar(name: string, fallback: string): string {
@@ -53,16 +55,17 @@ function hexToRgba(hex: string, alpha: number): string {
 function fillForVisual(
   visual: GraphNodeVisual | undefined,
   accentGlow: string,
+  colors: { amber: string; red: string },
   clusterColor: string | undefined,
 ): string {
   if (visual?.kind === 'active') {
     return accentGlow
   }
   if (visual?.kind === 'orphan') {
-    return 'rgba(248,113,113,0.10)'
+    return hexToRgba(colors.red, 0.12)
   }
   if (visual?.kind === 'bridge') {
-    return 'rgba(245,158,11,0.11)'
+    return hexToRgba(colors.amber, 0.12)
   }
   if (clusterColor) {
     return hexToRgba(clusterColor, 0.11)
@@ -127,11 +130,14 @@ function clusterHullPath(cluster: GraphCluster, nodeByGraphId: Map<string, Graph
   return `M${hull.map((point) => point.join(',')).join('L')}Z`
 }
 
-export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }: GraphViewProps) {
+export function GraphView({ graph, graphSettings, workspaceNodes, selectedNoteId, onOpenNote }: GraphViewProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null)
-  const clusters = useMemo(() => buildGraphClusters(graph, workspaceNodes), [graph, workspaceNodes])
+  const clusters = useMemo(
+    () => buildGraphClusters(graph, workspaceNodes, graphSettings.cluster_colors),
+    [graph, graphSettings.cluster_colors, workspaceNodes],
+  )
   const selectedCluster = clusters.find((cluster) => cluster.id === selectedClusterId) ?? null
   const clusterColorByNoteId = useMemo(() => {
     const colorByNoteId = new Map<string, string>()
@@ -154,11 +160,12 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
     const height = wrapper.clientHeight
     const accent = cssVar('--accent', '#5e8bff')
     const accentGlow = cssVar('--accent-glow', 'rgba(94,139,255,0.13)')
-    const amber = cssVar('--amber', '#f59e0b')
+    const amber = graphSettings.bridge_color || cssVar('--trace-graph-bridge', '#f59e0b')
     const border = cssVar('--border', 'rgba(255,255,255,0.06)')
     const border2 = cssVar('--border2', 'rgba(255,255,255,0.11)')
-    const red = cssVar('--red', '#f87171')
+    const red = graphSettings.orphan_color || cssVar('--trace-graph-orphan', '#f87171')
     const t3 = cssVar('--t3', '#555b6b')
+    const nodeScale = graphSettings.node_scale
     const visuals = buildGraphNodeVisuals(graph, workspaceNodes, selectedNoteId)
 
     const svg = d3.select(svgElement)
@@ -249,8 +256,13 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       .selectAll('circle')
       .data(nodes)
       .join('circle')
-      .attr('r', (datum) => radiusFromDegree(datum.degree))
-      .attr('fill', (datum) => fillForVisual(visuals.get(datum.noteId), accentGlow, clusterColorByNoteId.get(datum.noteId)))
+      .attr('r', (datum) => radiusFromDegree(datum.degree, nodeScale))
+      .attr('fill', (datum) => fillForVisual(
+        visuals.get(datum.noteId),
+        accentGlow,
+        { amber, red },
+        clusterColorByNoteId.get(datum.noteId),
+      ))
       .attr('stroke', (datum) => strokeForVisual(
         visuals.get(datum.noteId),
         { accent, amber, border2, red },
@@ -275,6 +287,7 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
     const label = canvas
       .append('g')
       .attr('pointer-events', 'none')
+      .style('display', graphSettings.show_labels ? null : 'none')
       .selectAll('text')
       .data(nodes)
       .join('text')
@@ -289,7 +302,7 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       .force('link', d3.forceLink<GraphNodeDatum, GraphLinkDatum>(links).id((datum) => datum.id).distance(86))
       .force('charge', d3.forceManyBody().strength(-260))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide((datum) => radiusFromDegree((datum as GraphNodeDatum).degree) + 12))
+      .force('collide', d3.forceCollide((datum) => radiusFromDegree((datum as GraphNodeDatum).degree, nodeScale) + 12))
       .on('tick', () => {
         const nodeByGraphId = new Map(nodes.map((datum) => [datum.id, datum]))
         clusterPath.attr('d', (cluster) => clusterHullPath(cluster, nodeByGraphId))
@@ -301,7 +314,7 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
           .attr('y2', (datum) => (datum.target as GraphNodeDatum).y ?? 0)
 
         node.attr('cx', (datum) => datum.x ?? 0).attr('cy', (datum) => datum.y ?? 0)
-        label.attr('x', (datum) => datum.x ?? 0).attr('y', (datum) => (datum.y ?? 0) + radiusFromDegree(datum.degree) + 11)
+        label.attr('x', (datum) => datum.x ?? 0).attr('y', (datum) => (datum.y ?? 0) + radiusFromDegree(datum.degree, nodeScale) + 11)
       })
 
     const drag = d3
@@ -333,7 +346,7 @@ export function GraphView({ graph, workspaceNodes, selectedNoteId, onOpenNote }:
       svg.on('dblclick', null)
       tooltip.remove()
     }
-  }, [clusterColorByNoteId, clusters, graph, onOpenNote, selectedNoteId, workspaceNodes])
+  }, [clusterColorByNoteId, clusters, graph, graphSettings, onOpenNote, selectedNoteId, workspaceNodes])
 
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col bg-[var(--bg)] p-4">

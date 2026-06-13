@@ -8,6 +8,7 @@ export type {
   NoteSearchResult,
   TraceConfig,
   TraceEditorSettings,
+  TraceGraphSettings,
   TraceLayoutConfig,
   TraceRightPanelMode,
   TraceSidebarPosition,

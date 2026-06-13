@@ -65,6 +65,7 @@ function DesktopApp() {
     traceAccentColor,
     traceFontFamily,
     traceEditorSettings,
+    traceGraphSettings,
     traceLayout,
     editorWidth,
     isBacklinksPanelOpen,
@@ -114,6 +115,7 @@ function DesktopApp() {
     togglePropertiesPanel,
     updateTraceAppearance,
     updateTraceEditorSettings,
+    updateTraceGraphSettings,
     updateTraceLayout,
     updateUIModule,
     setEditorWidth,
@@ -405,6 +407,7 @@ function DesktopApp() {
         traceAccentColor={traceAccentColor}
         traceFontFamily={traceFontFamily}
         traceEditorSettings={traceEditorSettings}
+        traceGraphSettings={traceGraphSettings}
         traceLayout={traceLayout}
         uiModules={uiModules}
         viewMode={viewMode}
@@ -432,6 +435,7 @@ function DesktopApp() {
         onTitleChange={queueNoteTitleSave}
         onUpdateTraceAppearance={(patch) => void updateTraceAppearance(patch)}
         onUpdateTraceEditorSettings={(patch) => void updateTraceEditorSettings(patch)}
+        onUpdateTraceGraphSettings={(patch) => void updateTraceGraphSettings(patch)}
         onUpdateTraceLayout={(layout) => void updateTraceLayout(layout)}
         onToggleModule={(module, enabled) => void updateUIModule(module, enabled)}
         onTogglePropertiesPanel={togglePropertiesPanel}

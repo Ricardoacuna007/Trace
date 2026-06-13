@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { TraceEditorSettings, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
+import type { TraceEditorSettings, TraceGraphSettings, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
 import type { Note } from '../../types/note'
 import type { AppNode } from '../../types/workspace'
 import { CustomizationEditors } from './components/CustomizationEditors'
@@ -23,6 +23,7 @@ interface SettingsViewProps {
   traceAccentColor: string
   traceFontFamily: string
   traceEditorSettings: TraceEditorSettings
+  traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
   editorWidth: 'full' | 'centered'
   uiModules: TraceUIModules
@@ -40,6 +41,7 @@ interface SettingsViewProps {
     font_family: string
   }>) => void
   onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
+  onUpdateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
 }
@@ -59,6 +61,7 @@ export function SettingsView({
   traceAccentColor,
   traceFontFamily,
   traceEditorSettings,
+  traceGraphSettings,
   traceLayout,
   editorWidth,
   uiModules,
@@ -72,6 +75,7 @@ export function SettingsView({
   onSetEditorWidth,
   onUpdateTraceAppearance,
   onUpdateTraceEditorSettings,
+  onUpdateTraceGraphSettings,
   onUpdateTraceLayout,
   onToggleModule,
 }: SettingsViewProps) {
@@ -122,11 +126,13 @@ export function SettingsView({
           traceAccentColor={traceAccentColor}
           traceFontFamily={traceFontFamily}
           traceEditorSettings={traceEditorSettings}
+          traceGraphSettings={traceGraphSettings}
           traceLayout={traceLayout}
           uiModules={uiModules}
           onSetEditorWidth={onSetEditorWidth}
           onUpdateTraceAppearance={onUpdateTraceAppearance}
           onUpdateTraceEditorSettings={onUpdateTraceEditorSettings}
+          onUpdateTraceGraphSettings={onUpdateTraceGraphSettings}
           onUpdateTraceLayout={onUpdateTraceLayout}
           onToggleModule={onToggleModule}
         />

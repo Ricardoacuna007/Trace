@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { TraceEditorSettings, TraceLayoutConfig, TraceUIModules } from '../../../lib/db'
+import type { TraceEditorSettings, TraceGraphSettings, TraceLayoutConfig, TraceUIModules } from '../../../lib/db'
 
 interface UIModulesSectionProps {
   editorWidth: 'full' | 'centered'
@@ -7,6 +7,7 @@ interface UIModulesSectionProps {
   traceAccentColor: string
   traceFontFamily: string
   traceEditorSettings: TraceEditorSettings
+  traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
   uiModules: TraceUIModules
   onSetEditorWidth: (width: 'full' | 'centered') => void
@@ -16,6 +17,7 @@ interface UIModulesSectionProps {
     font_family: string
   }>) => void
   onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
+  onUpdateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
 }
@@ -23,6 +25,7 @@ interface UIModulesSectionProps {
 const toggleClassName = 'h-4 w-4 rounded border-[var(--border2)] bg-[var(--bg4)] accent-[var(--accent)]'
 const inputClassName = 'h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] px-2 text-xs text-[var(--t1)] outline-none transition-colors focus:border-[var(--accent)]'
 const accentPresets = ['#5e8bff', '#4ade80', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee']
+const defaultClusterColors = ['#5e8bff', '#4ade80', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee']
 const fontOptions = ['DM Sans', 'Inter', 'system-ui', 'Georgia']
 
 function segmentedClassName(active: boolean): string {
@@ -43,11 +46,13 @@ export function UIModulesSection({
   traceAccentColor,
   traceFontFamily,
   traceEditorSettings,
+  traceGraphSettings,
   traceLayout,
   uiModules,
   onSetEditorWidth,
   onUpdateTraceAppearance,
   onUpdateTraceEditorSettings,
+  onUpdateTraceGraphSettings,
   onUpdateTraceLayout,
   onToggleModule,
 }: UIModulesSectionProps) {
@@ -233,7 +238,7 @@ export function UIModulesSection({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg3)] px-3 py-3">
           <FieldLabel>Elementos visibles</FieldLabel>
           <div className="space-y-2 text-xs">
@@ -266,6 +271,60 @@ export function UIModulesSection({
             />
           </div>
         </div>
+
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg3)] px-3 py-3">
+          <FieldLabel>Grafo</FieldLabel>
+          <div className="space-y-3 text-xs">
+            <ColorField
+              label="Huerfanos"
+              value={traceGraphSettings.orphan_color}
+              fallback="#f87171"
+              onChange={(color) => onUpdateTraceGraphSettings({ orphan_color: color })}
+            />
+            <ColorField
+              label="Puentes"
+              value={traceGraphSettings.bridge_color}
+              fallback="#f59e0b"
+              onChange={(color) => onUpdateTraceGraphSettings({ bridge_color: color })}
+            />
+            <div>
+              <p className="mb-1.5 text-[var(--t2)]">Clusters</p>
+              <div className="flex flex-wrap gap-1.5">
+                {defaultClusterColors.map((fallbackColor, index) => {
+                  const value = traceGraphSettings.cluster_colors[index] ?? fallbackColor
+                  return (
+                    <input
+                      key={`cluster-color-${index}`}
+                      type="color"
+                      aria-label={`Color de cluster ${index + 1}`}
+                      value={isHexColor(value) ? value : fallbackColor}
+                      className="h-6 w-7 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-0.5"
+                      onChange={(event) => {
+                        const nextColors = [...traceGraphSettings.cluster_colors]
+                        nextColors[index] = event.target.value
+                        onUpdateTraceGraphSettings({ cluster_colors: nextColors })
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+            <ToggleRow
+              label="Mostrar etiquetas"
+              checked={traceGraphSettings.show_labels}
+              onChange={(value) => onUpdateTraceGraphSettings({ show_labels: value })}
+            />
+            <RangeField
+              label="Tamano de nodos"
+              max={1.5}
+              min={0.75}
+              step={0.05}
+              suffix="x"
+              value={traceGraphSettings.node_scale}
+              onChange={(value) => onUpdateTraceGraphSettings({ node_scale: value })}
+            />
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -273,6 +332,33 @@ export function UIModulesSection({
 
 function isHexColor(value: string): boolean {
   return /^#[\da-f]{6}$/i.test(value.trim())
+}
+
+function ColorField({
+  fallback,
+  label,
+  onChange,
+  value,
+}: {
+  fallback: string
+  label: string
+  onChange: (value: string) => void
+  value: string
+}) {
+  const safeValue = isHexColor(value) ? value : fallback
+
+  return (
+    <label className="flex items-center justify-between gap-3 text-[var(--t2)]">
+      <span>{label}</span>
+      <input
+        type="color"
+        value={safeValue}
+        aria-label={`Color de ${label.toLowerCase()}`}
+        className="h-7 w-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg)] p-1"
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  )
 }
 
 function ToggleRow({

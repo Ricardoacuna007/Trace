@@ -3,6 +3,7 @@ import { isTauriRuntime } from './runtime'
 import type {
   TraceConfig,
   TraceEditorSettings,
+  TraceGraphSettings,
   TraceLayoutConfig,
   TraceRightPanelMode,
   TraceSidebarPosition,
@@ -31,6 +32,27 @@ function numberInRange(value: unknown, fallback: number, min: number, max: numbe
   return Math.min(max, Math.max(min, value))
 }
 
+function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[\da-f]{6}$/i.test(value.trim())
+}
+
+function parseColor(value: unknown, fallback: string): string {
+  return isHexColor(value) ? value.trim() : fallback
+}
+
+function parseColorArray(value: unknown, fallback: string[], maxItems: number): string[] {
+  if (!Array.isArray(value)) {
+    return fallback
+  }
+
+  const colors = value
+    .filter(isHexColor)
+    .map((color) => color.trim())
+    .slice(0, maxItems)
+
+  return colors.length > 0 ? colors : fallback
+}
+
 export function parseTraceConfig(configJson: string): TraceConfig {
   const defaultUiModules: TraceUIModules = {
     show_breadcrumbs: true,
@@ -57,6 +79,13 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     block_spacing: 8,
     max_width: 980,
   }
+  const defaultGraph: TraceGraphSettings = {
+    orphan_color: '#f87171',
+    bridge_color: '#f59e0b',
+    cluster_colors: ['#5e8bff', '#4ade80', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee'],
+    show_labels: true,
+    node_scale: 1,
+  }
 
   const fallback: TraceConfig = {
     theme: 'dark',
@@ -64,6 +93,7 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     font_family: 'DM Sans',
     editor_width: 'centered',
     editor: defaultEditor,
+    graph: defaultGraph,
     vim_mode: false,
     layout: defaultLayout,
     ui_modules: defaultUiModules,
@@ -94,6 +124,9 @@ export function parseTraceConfig(configJson: string): TraceConfig {
     const rawEditor = config.editor && typeof config.editor === 'object'
       ? config.editor as Record<string, unknown>
       : {}
+    const rawGraph = config.graph && typeof config.graph === 'object'
+      ? config.graph as Record<string, unknown>
+      : {}
 
     return {
       ...fallback,
@@ -107,6 +140,13 @@ export function parseTraceConfig(configJson: string): TraceConfig {
         line_height: numberInRange(rawEditor.line_height, defaultEditor.line_height, 1.35, 2.1),
         block_spacing: numberInRange(rawEditor.block_spacing, defaultEditor.block_spacing, 4, 20),
         max_width: numberInRange(rawEditor.max_width, defaultEditor.max_width, 680, 1280),
+      },
+      graph: {
+        orphan_color: parseColor(rawGraph.orphan_color, defaultGraph.orphan_color),
+        bridge_color: parseColor(rawGraph.bridge_color, defaultGraph.bridge_color),
+        cluster_colors: parseColorArray(rawGraph.cluster_colors, defaultGraph.cluster_colors, 6),
+        show_labels: Boolean(rawGraph.show_labels ?? defaultGraph.show_labels),
+        node_scale: numberInRange(rawGraph.node_scale, defaultGraph.node_scale, 0.75, 1.5),
       },
       vim_mode: Boolean(config.vim_mode),
       pinned_note_ids: parseStringArray(config.pinned_note_ids),

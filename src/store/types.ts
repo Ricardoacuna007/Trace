@@ -6,6 +6,7 @@ import type {
   MarkdownDbSnapshot,
   NoteSearchResult,
   TraceEditorSettings,
+  TraceGraphSettings,
   TraceLayoutConfig,
   TraceUIModules,
 } from '../lib/db'
@@ -126,6 +127,7 @@ export interface UISlice {
   traceAccentColor: string
   traceFontFamily: string
   traceEditorSettings: TraceEditorSettings
+  traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
   editorWidth: 'full' | 'centered'
   isSidebarOpen: boolean
@@ -145,6 +147,7 @@ export interface UISlice {
     font_family: string
   }>) => Promise<void>
   updateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => Promise<void>
+  updateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => Promise<void>
   updateTraceLayout: (layout: TraceLayoutConfig) => Promise<void>
   updateUIModule: (module: keyof TraceUIModules, value: boolean) => Promise<void>
   setEditorWidth: (width: 'full' | 'centered') => Promise<void>

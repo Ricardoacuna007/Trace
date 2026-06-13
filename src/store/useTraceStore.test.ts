@@ -24,6 +24,13 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       block_spacing: 8,
       max_width: 980,
     },
+    graph: {
+      orphan_color: '#f87171',
+      bridge_color: '#f59e0b',
+      cluster_colors: ['#5e8bff', '#4ade80', '#f59e0b', '#f87171', '#a78bfa', '#22d3ee'],
+      show_labels: true,
+      node_scale: 1,
+    },
     vim_mode: false,
     pinned_note_ids: [],
     layout: {
@@ -58,6 +65,10 @@ function parseMockTraceConfig(configJson: string): TraceConfig {
       editor: {
         ...fallback.editor,
         ...(parsed.editor ?? {}),
+      },
+      graph: {
+        ...fallback.graph,
+        ...(parsed.graph ?? {}),
       },
       layout: {
         ...fallback.layout,

@@ -67,4 +67,24 @@ describe('parseTraceConfig', () => {
       max_width: 1100,
     })
   })
+
+  it('normalizes graph appearance settings', () => {
+    const config = parseTraceConfig(JSON.stringify({
+      graph: {
+        orphan_color: '#111111',
+        bridge_color: 'not-a-color',
+        cluster_colors: ['#222222', '#333333', 'bad', '#444444', '#555555', '#666666', '#777777'],
+        show_labels: false,
+        node_scale: 99,
+      },
+    }))
+
+    expect(config.graph).toEqual({
+      orphan_color: '#111111',
+      bridge_color: '#f59e0b',
+      cluster_colors: ['#222222', '#333333', '#444444', '#555555', '#666666', '#777777'],
+      show_labels: false,
+      node_scale: 1.5,
+    })
+  })
 })

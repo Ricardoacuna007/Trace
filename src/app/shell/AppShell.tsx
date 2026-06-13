@@ -1,7 +1,14 @@
 ﻿import type { Block } from '@blocknote/core'
 import { Suspense, lazy } from 'react'
 import type { NoteGraphData } from '../../features/notes-graph/graph'
-import type { MarkdownDbSnapshot, NoteBacklink, TraceEditorSettings, TraceLayoutConfig, TraceUIModules } from '../../lib/db'
+import type {
+  MarkdownDbSnapshot,
+  NoteBacklink,
+  TraceEditorSettings,
+  TraceGraphSettings,
+  TraceLayoutConfig,
+  TraceUIModules,
+} from '../../lib/db'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../../store/types'
 import type { Note } from '../../types/note'
 import type { AppNode, TreeNode as WorkspaceTreeNode } from '../../types/workspace'
@@ -61,6 +68,7 @@ interface AppShellProps {
   traceAccentColor: string
   traceFontFamily: string
   traceEditorSettings: TraceEditorSettings
+  traceGraphSettings: TraceGraphSettings
   traceLayout: TraceLayoutConfig
   uiModules: TraceUIModules
   viewMode: ViewMode
@@ -95,6 +103,7 @@ interface AppShellProps {
     font_family: string
   }>) => void
   onUpdateTraceEditorSettings: (patch: Partial<TraceEditorSettings>) => void
+  onUpdateTraceGraphSettings: (patch: Partial<TraceGraphSettings>) => void
   onUpdateTraceLayout: (layout: TraceLayoutConfig) => void
   onToggleModule: (module: keyof TraceUIModules, enabled: boolean) => void
   onTogglePropertiesPanel: () => void
@@ -167,6 +176,7 @@ export function AppShell({
   traceAccentColor,
   traceFontFamily,
   traceEditorSettings,
+  traceGraphSettings,
   traceLayout,
   uiModules,
   viewMode,
@@ -197,6 +207,7 @@ export function AppShell({
   onTitleChange,
   onUpdateTraceAppearance,
   onUpdateTraceEditorSettings,
+  onUpdateTraceGraphSettings,
   onUpdateTraceLayout,
   onToggleModule,
   onTogglePropertiesPanel,
@@ -253,6 +264,7 @@ export function AppShell({
                 traceAccentColor={traceAccentColor}
                 traceFontFamily={traceFontFamily}
                 traceEditorSettings={traceEditorSettings}
+                traceGraphSettings={traceGraphSettings}
                 traceLayout={traceLayout}
                 configJson={traceConfigJson}
                 customCss={customCss}
@@ -274,6 +286,7 @@ export function AppShell({
                 onSetEditorWidth={onSetEditorWidth}
                 onUpdateTraceAppearance={onUpdateTraceAppearance}
                 onUpdateTraceEditorSettings={onUpdateTraceEditorSettings}
+                onUpdateTraceGraphSettings={onUpdateTraceGraphSettings}
                 onUpdateTraceLayout={onUpdateTraceLayout}
                 onToggleModule={onToggleModule}
               />
@@ -291,6 +304,7 @@ export function AppShell({
             <Suspense fallback={<ViewFallback label="Cargando grafo..." />}>
               <LazyGraphView
                 graph={graphData}
+                graphSettings={traceGraphSettings}
                 workspaceNodes={nodes}
                 selectedNoteId={selectedNote?.id ?? null}
                 onOpenNote={onOpenNodeFromGraph}

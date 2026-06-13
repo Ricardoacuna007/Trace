@@ -72,12 +72,21 @@ export interface TraceEditorSettings {
   max_width: number
 }
 
+export interface TraceGraphSettings {
+  orphan_color: string
+  bridge_color: string
+  cluster_colors: string[]
+  show_labels: boolean
+  node_scale: number
+}
+
 export interface TraceConfig {
   theme: 'dark' | 'light'
   accent_color: string
   font_family: string
   editor_width: 'full' | 'centered' | string
   editor: TraceEditorSettings
+  graph: TraceGraphSettings
   vim_mode: boolean
   layout: TraceLayoutConfig
   ui_modules: TraceUIModules
