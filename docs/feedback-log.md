@@ -49,3 +49,66 @@ Resultado:
 - Se crea este feedback log.
 - Se agregan templates de GitHub Issues.
 - Se documenta el roadmap v0.3 como referencia de producto.
+
+### FEEDBACK-003 - BlockNote falla en WebView2 instalado manualmente
+
+Tipo: bug / compatibilidad
+Prioridad: P0
+Version reportada: build manual v0.2.x
+Origen: tester externo
+Estado: mitigado en v0.2.2, seguimiento abierto
+
+Problema:
+
+En algunos WebView2 de Windows, BlockNote fallo al cargar con `Cannot read properties of undefined (reading 'empty')`.
+
+Solucion aplicada:
+
+- BlockNote, Tiptap y ProseMirror se empaquetan juntos para evitar imports circulares rotos en produccion.
+- El editor queda protegido con `ErrorBoundary`.
+- Si BlockNote vuelve a fallar, Trace activa modo seguro con textarea para no perder contenido.
+
+Seguimiento:
+
+- Mantener el chunk de BlockNote unido aunque Vite avise por tamano grande.
+- Probar build instalado en Windows antes de publicar release final.
+
+### FEEDBACK-004 - Botones de nota sin accion visible
+
+Tipo: bug / UX
+Prioridad: P1
+Version reportada: v0.2.x
+Origen: tester externo
+Estado: resuelto en v0.2.3
+
+Problema:
+
+Los botones de compartir y tres puntos estaban visibles, pero no ejecutaban acciones utiles.
+
+Solucion aplicada:
+
+- Compartir copia una referencia interna `[[titulo]]`.
+- El menu de tres puntos expone acciones reales: copiar referencia, conectar nota, exportar Markdown, imprimir/PDF, alternar propiedades y abrir comandos.
+
+### FEEDBACK-005 - Self-host web tenia placeholders de conexiones
+
+Tipo: mejora / self-host
+Prioridad: P1
+Version reportada: v0.3 en desarrollo
+Origen: roadmap interno
+Estado: resuelto en rama `codex/v0.3`
+
+Problema:
+
+La UI web self-host podia listar/editar notas, pero conectar, desconectar e ignorar sugerencias todavia mostraba mensajes de placeholder.
+
+Solucion aplicada:
+
+- API HTTP para desconectar relaciones bidireccionales.
+- API HTTP para listar e ignorar sugerencias.
+- Modal web para conectar notas sin depender del store desktop.
+- El panel derecho web ya acepta, desconecta e ignora sugerencias.
+
+Seguimiento:
+
+- Carpetas, import/export Markdown y personalizacion visual web siguen como pendientes separados.
