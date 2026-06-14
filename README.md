@@ -256,6 +256,7 @@ Mapa de flujo y responsabilidades:
 Direccion self-hosted all-in-one:
 
 - `docs/architecture/self-hosted-all-in-one.md`
+- `docs/roadmap-v0.2-to-v1.md`
 
 Seguridad:
 
@@ -266,3 +267,4 @@ Versionado y releases:
 
 - `CHANGELOG.md`
 - `docs/release-process.md`
+- `docs/v0.3-release-qa.md`

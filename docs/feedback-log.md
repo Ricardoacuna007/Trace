@@ -137,3 +137,21 @@ Seguimiento:
 
 - Probar relevancia con vaults reales antes de taggear `v0.3.0`.
 - Mantener QA de Windows instalado y Docker real como bloqueo de release.
+
+### FEEDBACK-007 - Gate de QA antes de v0.3.0
+
+Tipo: release / QA
+Prioridad: P0
+Version reportada: v0.3 en desarrollo
+Origen: revision de release
+Estado: documentado
+
+Problema:
+
+La version v0.3 agrega features que pasan en desarrollo pero pueden fallar en uso real: sugerencias ruidosas en vaults personales, diferencias de PATH en Windows instalado y self-host Docker validado solo por smoke test.
+
+Decision:
+
+- No taggear `v0.3.0` hasta completar `docs/v0.3-release-qa.md`.
+- Usar el auditor `cargo run -p trace-core --example suggestion_audit -- <trace.db> 30 5` para revisar sugerencias con vault real.
+- Validar Windows instalado limpio y Docker end-to-end antes de generar release final.

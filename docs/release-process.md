@@ -13,10 +13,19 @@ npm run check
 2. Confirmar que GitHub Actions este verde:
 
 - `Build Linux Desktop`
+- `Build Windows Desktop`
 - `Build Docker Image`
 - `Security Audit`
 
-3. Actualizar `CHANGELOG.md`.
+3. Completar el gate de QA de v0.3:
+
+- Sugerencias inteligentes con vault real de 20-30 notas.
+- Windows instalado limpio.
+- Docker end-to-end con setup, notas, sugerencias, backup y restore.
+
+Ver checklist completo en `docs/v0.3-release-qa.md`.
+
+4. Actualizar `CHANGELOG.md`.
 
 ## Crear version
 
