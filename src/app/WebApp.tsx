@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NoteGraphData } from '../features/notes-graph/graph'
 import { previewFromContent } from '../features/notes-editor/contentMetrics'
 import { clearAccessToken, setAccessToken } from '../lib/auth'
-import { parseTraceConfig, type NoteBacklink, type TraceUIModules } from '../lib/db'
+import {
+  parseTraceConfig,
+  type NoteBacklink,
+  type TraceConfig,
+} from '../lib/db'
 import { apiFetch, apiJson, readJson, refreshAccessToken } from '../lib/http'
 import { withTree } from '../lib/workspace/nodeTree'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../store/types'
@@ -36,6 +40,12 @@ interface ImportSummary {
   createdRelations: number
 }
 
+interface WebCustomization {
+  traceDir: string
+  configJson: string
+  customCss: string
+}
+
 interface FormState {
   workspaceName: string
   email: string
@@ -43,13 +53,10 @@ interface FormState {
 }
 
 const DEFAULT_TRACE_CONFIG_JSON = '{}'
-const DEFAULT_TRACE_CONFIG = parseTraceConfig(DEFAULT_TRACE_CONFIG_JSON)
 const EMPTY_GRAPH: NoteGraphData = { nodes: [], links: [] }
-const DEFAULT_UI_MODULES: TraceUIModules = {
-  show_breadcrumbs: true,
-  show_backlinks: true,
-  show_node_icons: true,
-  enable_autosave: true,
+
+function toEditorWidthMode(value: string): 'full' | 'centered' {
+  return value === 'full' ? 'full' : 'centered'
 }
 
 function isNote(node: AppNode | undefined): node is Note {
@@ -130,8 +137,15 @@ export function WebApp() {
   const [webConnectOpen, setWebConnectOpen] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [webConfigJson, setWebConfigJson] = useState(DEFAULT_TRACE_CONFIG_JSON)
+  const [webCustomCss, setWebCustomCss] = useState('')
+  const [webTraceDir, setWebTraceDir] = useState<string | null>(null)
+  const [customizationLoading, setCustomizationLoading] = useState(false)
+  const [customizationSaving, setCustomizationSaving] = useState(false)
 
   const { nodeTree } = useMemo(() => withTree(nodes), [nodes])
+  const traceConfig = useMemo(() => parseTraceConfig(webConfigJson), [webConfigJson])
+  const editorWidth = useMemo(() => toEditorWidthMode(traceConfig.editor_width), [traceConfig.editor_width])
   const selectedNote = useMemo(
     () => {
       const selected = nodes.find((node) => node.id === selectedNodeId)
@@ -147,6 +161,51 @@ export function WebApp() {
     () => buildBacklinks(selectedNote?.id ?? null, nodes, relations),
     [nodes, relations, selectedNote?.id],
   )
+
+  const loadCustomization = useCallback(async () => {
+    setCustomizationLoading(true)
+    try {
+      const customization = await apiJson<WebCustomization>('/api/customization')
+      setWebTraceDir(customization.traceDir || 'server_settings')
+      setWebConfigJson(customization.configJson || DEFAULT_TRACE_CONFIG_JSON)
+      setWebCustomCss(customization.customCss ?? '')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo cargar personalizacion web')
+    } finally {
+      setCustomizationLoading(false)
+    }
+  }, [])
+
+  const saveWebCustomization = useCallback(async (configJson: string, customCss: string, options?: { silent?: boolean }) => {
+    const parsed = parseTraceConfig(configJson)
+    const nextConfigJson = JSON.stringify(parsed, null, 2)
+
+    setCustomizationSaving(true)
+    setWebConfigJson(nextConfigJson)
+    setWebCustomCss(customCss)
+    try {
+      const customization = await apiJson<WebCustomization>('/api/customization', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configJson: nextConfigJson, customCss }),
+      })
+      setWebTraceDir(customization.traceDir || 'server_settings')
+      setWebConfigJson(customization.configJson || nextConfigJson)
+      setWebCustomCss(customization.customCss ?? customCss)
+      if (!options?.silent) {
+        setMessage('Personalizacion guardada')
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo guardar personalizacion web')
+    } finally {
+      setCustomizationSaving(false)
+    }
+  }, [])
+
+  const persistWebConfigUpdate = useCallback(async (updater: (config: TraceConfig) => TraceConfig) => {
+    const nextConfig = updater(parseTraceConfig(webConfigJson || DEFAULT_TRACE_CONFIG_JSON))
+    await saveWebCustomization(JSON.stringify(nextConfig, null, 2), webCustomCss, { silent: true })
+  }, [saveWebCustomization, webConfigJson, webCustomCss])
 
   const loadWorkspace = useCallback(async () => {
     try {
@@ -167,6 +226,7 @@ export function WebApp() {
       ))
       setActiveView(nextNotes.length > 0 ? 'editor' : 'workspace')
       setViewMode(nextNotes.length > 0 ? 'editor' : 'workspace')
+      await loadCustomization()
       setMode('app')
       setMessage(null)
     } catch (error) {
@@ -174,7 +234,7 @@ export function WebApp() {
       setMode('login')
       setMessage(error instanceof Error ? error.message : 'No se pudo cargar el workspace')
     }
-  }, [])
+  }, [loadCustomization])
 
   const persistQueuedNote = useCallback(async (note: Note) => {
     setSaveStatus('saving')
@@ -610,7 +670,7 @@ export function WebApp() {
   if (path === '/settings') {
     return (
       <main className="flex h-full flex-col">
-        <ThemeInjector configJson={DEFAULT_TRACE_CONFIG_JSON} customCss="" />
+        <ThemeInjector configJson={webConfigJson} customCss={webCustomCss} />
         <WebSettings onBack={() => navigate('/')} onLogout={logout} />
       </main>
     )
@@ -618,7 +678,7 @@ export function WebApp() {
 
   return (
     <main className="flex h-full flex-col">
-      <ThemeInjector configJson={DEFAULT_TRACE_CONFIG_JSON} customCss="" />
+      <ThemeInjector configJson={webConfigJson} customCss={webCustomCss} />
       <CommandPalette
         open={commandOpen}
         query={commandQuery}
@@ -680,10 +740,10 @@ export function WebApp() {
         activeView={activeView}
         backlinks={backlinks}
         breadcrumbs={breadcrumbs}
-        customCss=""
-        customizationLoading={false}
-        customizationSaving={false}
-        editorWidth="centered"
+        customCss={webCustomCss}
+        customizationLoading={customizationLoading}
+        customizationSaving={customizationSaving}
+        editorWidth={editorWidth}
         graphData={graphData}
         hasPendingChanges={saveStatus === 'saving'}
         ignoredSuggestionPairs={ignoredSuggestionPairs}
@@ -703,16 +763,16 @@ export function WebApp() {
         saveStatus={saveStatus}
         selectedNodeId={selectedNodeId}
         selectedNote={selectedNote}
-        traceConfigJson={DEFAULT_TRACE_CONFIG_JSON}
-        traceDir={null}
-        traceTheme={DEFAULT_TRACE_CONFIG.theme}
-        traceAccentColor={DEFAULT_TRACE_CONFIG.accent_color}
-        traceFontFamily={DEFAULT_TRACE_CONFIG.font_family}
-        traceCodeRunnerSettings={DEFAULT_TRACE_CONFIG.code_runner}
-        traceEditorSettings={DEFAULT_TRACE_CONFIG.editor}
-        traceGraphSettings={DEFAULT_TRACE_CONFIG.graph}
-        traceLayout={DEFAULT_TRACE_CONFIG.layout}
-        uiModules={DEFAULT_UI_MODULES}
+        traceConfigJson={webConfigJson}
+        traceDir={webTraceDir}
+        traceTheme={traceConfig.theme}
+        traceAccentColor={traceConfig.accent_color}
+        traceFontFamily={traceConfig.font_family}
+        traceCodeRunnerSettings={traceConfig.code_runner}
+        traceEditorSettings={traceConfig.editor}
+        traceGraphSettings={traceConfig.graph}
+        traceLayout={traceConfig.layout}
+        uiModules={traceConfig.ui_modules}
         viewMode={viewMode}
         onContentChange={handleContentChange}
         onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
@@ -731,20 +791,65 @@ export function WebApp() {
         onOpenWikiLink={(title) => void openWikiLink(title)}
         onPinNote={pinNote}
         onRefreshMarkdownDatabase={() => setMessage('La base Markdown local solo esta disponible en desktop.')}
-        onReloadCustomization={() => setMessage('La personalizacion por vault local solo esta disponible en desktop.')}
-        onSaveCustomization={() => setMessage('La personalizacion por vault local solo esta disponible en desktop.')}
+        onReloadCustomization={() => void loadCustomization()}
+        onSaveCustomization={(configJson, customCss) => void saveWebCustomization(configJson, customCss)}
         onSetActiveView={(nextView) => {
           setActiveView(nextView)
           setViewMode(nextView)
         }}
-        onSetEditorWidth={() => setMessage('El ancho del editor web se configurara en settings self-host.')}
-        onUpdateTraceAppearance={() => setMessage('La apariencia web se configurara en settings self-host.')}
-        onUpdateTraceCodeRunnerSettings={() => setMessage('La ejecucion de codigo web se configurara en settings self-host.')}
-        onUpdateTraceEditorSettings={() => setMessage('El editor web se configurara en settings self-host.')}
-        onUpdateTraceGraphSettings={() => setMessage('El grafo web se configurara en settings self-host.')}
-        onUpdateTraceLayout={() => setMessage('El layout web se configurara en settings self-host.')}
+        onSetEditorWidth={(width) => void persistWebConfigUpdate((config) => ({ ...config, editor_width: width }))}
+        onUpdateTraceAppearance={(patch) => {
+          void persistWebConfigUpdate((config) => ({
+            ...config,
+            theme: patch.theme ?? config.theme,
+            accent_color: patch.accent_color ?? config.accent_color,
+            font_family: patch.font_family ?? config.font_family,
+          }))
+        }}
+        onUpdateTraceCodeRunnerSettings={(patch) => {
+          void persistWebConfigUpdate((config) => ({
+            ...config,
+            code_runner: {
+              ...config.code_runner,
+              ...patch,
+            },
+          }))
+        }}
+        onUpdateTraceEditorSettings={(patch) => {
+          void persistWebConfigUpdate((config) => ({
+            ...config,
+            editor: {
+              ...config.editor,
+              ...patch,
+            },
+          }))
+        }}
+        onUpdateTraceGraphSettings={(patch) => {
+          void persistWebConfigUpdate((config) => ({
+            ...config,
+            graph: {
+              ...config.graph,
+              ...patch,
+            },
+          }))
+        }}
+        onUpdateTraceLayout={(layout) => {
+          setPropertiesPanelOpen(layout.right_panel === 'visible')
+          void persistWebConfigUpdate((config) => ({
+            ...config,
+            layout,
+          }))
+        }}
         onTitleChange={handleTitleChange}
-        onToggleModule={() => setMessage('Los modulos UI web se configuraran en settings self-host.')}
+        onToggleModule={(module, enabled) => {
+          void persistWebConfigUpdate((config) => ({
+            ...config,
+            ui_modules: {
+              ...config.ui_modules,
+              [module]: enabled,
+            },
+          }))
+        }}
         onTogglePropertiesPanel={() => setPropertiesPanelOpen((open) => !open)}
         onUnpinNote={unpinNote}
         onPrintCurrentNote={() => window.print()}

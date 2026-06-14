@@ -75,6 +75,11 @@ const AUTH_RATE_LIMIT_WINDOW_SECONDS: i64 = 15 * 60;
 const ACCESS_TOKEN_TTL_SECONDS: i64 = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS: i64 = 60 * 60 * 24 * 30;
 const REFRESH_COOKIE_NAME: &str = "trace_refresh";
+const SERVER_TRACE_CONFIG_KEY: &str = "trace_config_json";
+const SERVER_CUSTOM_CSS_KEY: &str = "custom_css";
+const DEFAULT_SERVER_TRACE_CONFIG_JSON: &str = "{}";
+const DEFAULT_SERVER_CUSTOM_CSS: &str =
+    "/* Trace web custom.css\n   Ajustes visuales del self-host.\n*/\n";
 const CONTENT_SECURITY_POLICY: &str = concat!(
     "default-src 'self'; ",
     "script-src 'self'; ",
@@ -180,6 +185,21 @@ struct RestorePreviewResponse {
     size_bytes: u64,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerCustomizationResponse {
+    trace_dir: String,
+    config_json: String,
+    custom_css: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveServerCustomizationRequest {
+    config_json: String,
+    custom_css: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -229,6 +249,10 @@ fn build_router(state: AppState) -> Router {
         .route("/api/export/note/:id", get(api_export_note_markdown))
         .route("/api/export/vault", get(api_export_vault_markdown))
         .route("/api/import/markdown", post(api_import_markdown_zip))
+        .route(
+            "/api/customization",
+            get(api_get_customization).put(api_save_customization),
+        )
         .route("/api/backup", post(api_backup))
         .route("/api/backup/history", get(api_backup_history))
         .route("/api/restore", post(api_restore))
@@ -753,6 +777,23 @@ async fn api_import_markdown_zip(State(state): State<AppState>, body: Bytes) -> 
     }
 }
 
+async fn api_get_customization(State(state): State<AppState>) -> Response {
+    match load_server_customization(&state) {
+        Ok(customization) => Json(customization).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_save_customization(
+    State(state): State<AppState>,
+    Json(payload): Json<SaveServerCustomizationRequest>,
+) -> Response {
+    match save_server_customization(&state, payload) {
+        Ok(customization) => Json(customization).into_response(),
+        Err(error) => customization_error_response(error),
+    }
+}
+
 async fn api_backup(
     State(state): State<AppState>,
     Extension(claims): Extension<Claims>,
@@ -1240,6 +1281,72 @@ fn record_backup_history(connection: &Connection, filename: &str, size_bytes: i6
     Ok(())
 }
 
+fn load_server_customization(state: &AppState) -> Result<ServerCustomizationResponse> {
+    let connection = open_connection(&state.db_path)?;
+    Ok(ServerCustomizationResponse {
+        trace_dir: "server_settings".to_string(),
+        config_json: read_server_setting(
+            &connection,
+            SERVER_TRACE_CONFIG_KEY,
+            DEFAULT_SERVER_TRACE_CONFIG_JSON,
+        )?,
+        custom_css: read_server_setting(
+            &connection,
+            SERVER_CUSTOM_CSS_KEY,
+            DEFAULT_SERVER_CUSTOM_CSS,
+        )?,
+    })
+}
+
+fn save_server_customization(
+    state: &AppState,
+    payload: SaveServerCustomizationRequest,
+) -> Result<ServerCustomizationResponse> {
+    validate_trace_config_json(&payload.config_json)?;
+    let connection = open_connection(&state.db_path)?;
+    upsert_server_setting(&connection, SERVER_TRACE_CONFIG_KEY, &payload.config_json)?;
+    upsert_server_setting(&connection, SERVER_CUSTOM_CSS_KEY, &payload.custom_css)?;
+
+    Ok(ServerCustomizationResponse {
+        trace_dir: "server_settings".to_string(),
+        config_json: payload.config_json,
+        custom_css: payload.custom_css,
+    })
+}
+
+fn read_server_setting(connection: &Connection, key: &str, fallback: &str) -> Result<String> {
+    let value = connection
+        .query_row(
+            "SELECT value FROM server_settings WHERE key = ?1",
+            [key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .with_context(|| format!("No se pudo leer server_settings.{key}"))?;
+
+    Ok(value.unwrap_or_else(|| fallback.to_string()))
+}
+
+fn upsert_server_setting(connection: &Connection, key: &str, value: &str) -> Result<()> {
+    connection
+        .execute(
+            "INSERT INTO server_settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )
+        .with_context(|| format!("No se pudo guardar server_settings.{key}"))?;
+    Ok(())
+}
+
+fn validate_trace_config_json(value: &str) -> Result<()> {
+    let parsed: serde_json::Value =
+        serde_json::from_str(value).context("JSON invalido en trace.config.json")?;
+    if !parsed.is_object() {
+        anyhow::bail!("trace.config.json debe contener un objeto JSON");
+    }
+    Ok(())
+}
+
 fn restore_backup_zip(state: &AppState, body: &[u8]) -> Result<()> {
     if body.is_empty() {
         anyhow::bail!("Backup vacio");
@@ -1521,6 +1628,15 @@ fn markdown_error_response(error: anyhow::Error) -> Response {
         return not_found("Nota no encontrada");
     }
     if is_markdown_bad_request(&message) {
+        return (StatusCode::BAD_REQUEST, Json(error_body(&message))).into_response();
+    }
+
+    server_error(error)
+}
+
+fn customization_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if message.contains("trace.config.json") || message.contains("JSON invalido") {
         return (StatusCode::BAD_REQUEST, Json(error_body(&message))).into_response();
     }
 

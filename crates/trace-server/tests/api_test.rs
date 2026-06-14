@@ -302,6 +302,66 @@ async fn test_markdown_export_import_zip() {
 }
 
 #[tokio::test]
+async fn test_web_customization_persists_and_validates_json() {
+    let server = TestServer::start().await;
+    let client = Client::builder()
+        .cookie_store(true)
+        .build()
+        .expect("client builds");
+    let auth = setup_admin(&server, &client).await;
+    let token = auth["token"].as_str().expect("token exists");
+
+    let initial = client
+        .get(format!("{}/api/customization", server.base_url))
+        .bearer_auth(token)
+        .send()
+        .await
+        .expect("customization responds");
+    assert_eq!(initial.status(), StatusCode::OK);
+    let initial_json = initial.json::<Value>().await.expect("customization json");
+    assert_eq!(initial_json["configJson"], "{}");
+
+    let invalid = client
+        .put(format!("{}/api/customization", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({
+            "configJson": "[]",
+            "customCss": ""
+        }))
+        .send()
+        .await
+        .expect("invalid customization responds");
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+
+    let saved = client
+        .put(format!("{}/api/customization", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({
+            "configJson": "{\"theme\":\"light\",\"accent_color\":\"#4ade80\"}",
+            "customCss": ".trace-test { color: red; }"
+        }))
+        .send()
+        .await
+        .expect("save customization responds");
+    assert_eq!(saved.status(), StatusCode::OK);
+
+    let loaded = client
+        .get(format!("{}/api/customization", server.base_url))
+        .bearer_auth(token)
+        .send()
+        .await
+        .expect("customization reload responds")
+        .json::<Value>()
+        .await
+        .expect("customization reload json");
+    assert!(loaded["configJson"]
+        .as_str()
+        .expect("config json string")
+        .contains("\"theme\":\"light\""));
+    assert_eq!(loaded["customCss"], ".trace-test { color: red; }");
+}
+
+#[tokio::test]
 async fn test_setup_returns_404_after_first_use() {
     let server = TestServer::start().await;
     let client = Client::builder()
