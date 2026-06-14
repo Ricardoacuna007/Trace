@@ -40,6 +40,12 @@ pub struct UpdateNoteInput {
     pub inbox: Option<bool>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveNodeInput {
+    pub parent_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeletedResponse {
@@ -190,6 +196,32 @@ pub fn update_note(
 pub fn delete_note(connection: &Connection, id: &str) -> Result<bool, rusqlite::Error> {
     let affected = connection.execute("DELETE FROM nodes WHERE id = ?1 AND type = 'note'", [id])?;
     Ok(affected > 0)
+}
+
+pub fn move_node(
+    connection: &Connection,
+    id: &str,
+    input: MoveNodeInput,
+) -> Result<Option<Node>, rusqlite::Error> {
+    let Some(_) = get_node(connection, id)? else {
+        return Ok(None);
+    };
+
+    let parent_id = input.parent_id.filter(|parent| !parent.trim().is_empty());
+    let position = next_position_for_parent(connection, parent_id.as_deref())?;
+    let now = now_iso();
+
+    connection.execute(
+        "UPDATE nodes
+         SET parent_id = ?1,
+             inbox = CASE WHEN ?1 IS NULL THEN inbox ELSE 0 END,
+             position = ?2,
+             updated_at = ?3
+         WHERE id = ?4",
+        params![parent_id, position, now, id],
+    )?;
+
+    get_node(connection, id)
 }
 
 pub fn list_relations(connection: &Connection) -> Result<Vec<NoteRelation>, rusqlite::Error> {
@@ -474,6 +506,18 @@ mod tests {
         assert_eq!(folder.node_type, NodeType::Folder);
         assert_eq!(folder.icon.as_deref(), Some("folder"));
 
+        let moved = move_node(
+            &connection,
+            &note.id,
+            MoveNodeInput {
+                parent_id: Some(folder.id.clone()),
+            },
+        )
+        .expect("move succeeds")
+        .expect("node exists");
+        assert_eq!(moved.parent_id.as_deref(), Some(folder.id.as_str()));
+        assert!(!moved.inbox);
+
         let updated = update_note(
             &connection,
             &note.id,
@@ -513,14 +557,12 @@ mod tests {
         .expect("relations insert");
         assert_eq!(created.len(), 2);
 
-        let removed = disconnect_notes(&mut connection, &updated.id, &target.id)
-            .expect("relations delete");
+        let removed =
+            disconnect_notes(&mut connection, &updated.id, &target.id).expect("relations delete");
         assert_eq!(removed.len(), 2);
-        assert!(
-            list_relations(&connection)
-                .expect("relations list")
-                .is_empty()
-        );
+        assert!(list_relations(&connection)
+            .expect("relations list")
+            .is_empty());
 
         let ignored = ignore_suggestion(&mut connection, &updated.id, &target.id)
             .expect("ignored suggestion inserts");

@@ -362,6 +362,59 @@ async fn test_web_customization_persists_and_validates_json() {
 }
 
 #[tokio::test]
+async fn test_move_node_processes_inbox_note() {
+    let server = TestServer::start().await;
+    let client = Client::builder()
+        .cookie_store(true)
+        .build()
+        .expect("client builds");
+    let auth = setup_admin(&server, &client).await;
+    let token = auth["token"].as_str().expect("token exists");
+
+    let folder = client
+        .post(format!("{}/api/folders", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({ "title": "Inbox target" }))
+        .send()
+        .await
+        .expect("folder responds")
+        .json::<Value>()
+        .await
+        .expect("folder json");
+    let folder_id = folder["id"].as_str().expect("folder id");
+
+    let note = client
+        .post(format!("{}/api/notes", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({
+            "title": "Captured idea",
+            "content": "[]",
+            "tags": [],
+            "inbox": true
+        }))
+        .send()
+        .await
+        .expect("note responds")
+        .json::<Value>()
+        .await
+        .expect("note json");
+    let note_id = note["id"].as_str().expect("note id");
+    assert_eq!(note["inbox"], true);
+
+    let moved = client
+        .post(format!("{}/api/nodes/{note_id}/move", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({ "parentId": folder_id }))
+        .send()
+        .await
+        .expect("move responds");
+    assert_eq!(moved.status(), StatusCode::OK);
+    let moved_json = moved.json::<Value>().await.expect("moved json");
+    assert_eq!(moved_json["parentId"], folder_id);
+    assert_eq!(moved_json["inbox"], false);
+}
+
+#[tokio::test]
 async fn test_setup_returns_404_after_first_use() {
     let server = TestServer::start().await;
     let client = Client::builder()

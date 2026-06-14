@@ -37,7 +37,9 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use trace_core::{
     auth::Claims,
     graph,
-    notes::{self, CreateFolderInput, CreateNoteInput, DeletedResponse, UpdateNoteInput},
+    notes::{
+        self, CreateFolderInput, CreateNoteInput, DeletedResponse, MoveNodeInput, UpdateNoteInput,
+    },
     schema,
 };
 use uuid::Uuid;
@@ -229,6 +231,7 @@ async fn main() -> Result<()> {
 fn build_router(state: AppState) -> Router {
     let protected_api = Router::new()
         .route("/api/nodes", get(api_list_nodes))
+        .route("/api/nodes/:id/move", post(api_move_node))
         .route("/api/notes", get(api_list_notes).post(api_create_note))
         .route("/api/folders", post(api_create_folder))
         .route(
@@ -646,6 +649,28 @@ async fn api_create_folder(
         notes::create_folder(&connection, payload).context("No se pudo crear carpeta")
     }) {
         Ok(folder) => (StatusCode::CREATED, Json(folder)).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_move_node(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<MoveNodeInput>,
+) -> Response {
+    if payload.parent_id.as_deref() == Some(id.as_str()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(error_body("Un nodo no puede moverse dentro de si mismo")),
+        )
+            .into_response();
+    }
+
+    match open_connection(&state.db_path).and_then(|connection| {
+        notes::move_node(&connection, &id, payload).context("No se pudo mover nodo")
+    }) {
+        Ok(Some(node)) => Json(node).into_response(),
+        Ok(None) => not_found("Nodo no encontrado"),
         Err(error) => server_error(error),
     }
 }

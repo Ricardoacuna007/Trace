@@ -392,6 +392,20 @@ export function WebApp() {
     }
   }, [])
 
+  const moveNode = useCallback(async (id: string, newParentId: string | null) => {
+    try {
+      const moved = await apiJson<AppNode>(`/api/nodes/${encodeURIComponent(id)}/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId: newParentId }),
+      })
+      setNodes((current) => current.map((node) => (node.id === moved.id ? moved : node)))
+      setMessage(moved.inbox ? 'Nodo movido' : 'Captura procesada')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo mover el nodo')
+    }
+  }, [])
+
   const connectNotes = useCallback(async (sourceId: string, targetIds: string[]) => {
     const targets = Array.from(new Set(targetIds.filter((targetId) => targetId && targetId !== sourceId)))
     if (targets.length === 0) {
@@ -778,7 +792,7 @@ export function WebApp() {
         onConnectNotes={(sourceId, targetIds) => void connectNotes(sourceId, targetIds)}
         onDisconnectNotes={(sourceId, targetId) => void disconnectNotes(sourceId, targetId)}
         onIgnoreConnectionSuggestion={(sourceId, targetId) => void ignoreConnectionSuggestion(sourceId, targetId)}
-        onMoveNode={() => setMessage('Procesar bandeja desde web se agregara al flujo unificado.')}
+        onMoveNode={(id, newParentId) => void moveNode(id, newParentId)}
         onCreateFolder={() => void createFolder()}
         onCreateNote={() => void createNote()}
         onExportCurrentNoteMarkdown={() => void exportCurrentNoteMarkdown()}
