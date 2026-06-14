@@ -24,7 +24,7 @@ Tipo: bug / UX
 Prioridad: P1
 Version reportada: v0.2.3
 Origen: testers externos
-Estado: resuelto en v0.2.4
+Estado: reabierto y reforzado en rama `codex/v0.3`
 
 Problema:
 
@@ -32,7 +32,7 @@ Cuando una nota tiene un titulo largo, el titulo principal del editor no se ve b
 
 Solucion aceptada:
 
-- Editor principal: permitir wrap visual hasta 3 lineas y mantener una sola linea logica de texto.
+- Editor principal: permitir wrap visual hasta varias lineas, romper palabras largas y mantener una sola linea logica de texto.
 - Sidebar, breadcrumb y paneles compactos: usar ellipsis con tooltip de titulo completo.
 - Workspace cards: permitir hasta 2 lineas para que el nombre respire sin romper layout.
 
@@ -111,4 +111,5 @@ Solucion aplicada:
 
 Seguimiento:
 
-- Carpetas, import/export Markdown y personalizacion visual web siguen como pendientes separados.
+- Import/export Markdown web, carpetas, conexiones y personalizacion visual web ya tienen endpoints/acciones reales en rama `codex/v0.3`.
+- La bandeja de entrada web ya puede procesar notas moviendolas a carpetas sugeridas.

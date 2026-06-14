@@ -42,7 +42,7 @@ export function EditorWrapper({
     }
 
     titleElement.style.height = '0px'
-    const maxHeight = 96
+    const maxHeight = 160
     const nextHeight = Math.min(titleElement.scrollHeight, maxHeight)
     titleElement.style.height = `${nextHeight}px`
     titleElement.style.overflowY = titleElement.scrollHeight > maxHeight ? 'auto' : 'hidden'
@@ -64,7 +64,8 @@ export function EditorWrapper({
           title={note.title}
           rows={1}
           spellCheck
-          className="mb-1 max-h-24 min-h-[32px] w-full resize-none break-words bg-transparent text-[26px] font-light leading-tight tracking-normal text-[var(--t1)] outline-none placeholder:text-[var(--t3)]"
+          className="trace-scrollbar mb-1 max-h-40 min-h-[32px] w-full resize-none overflow-x-hidden break-words bg-transparent pr-2 text-[26px] font-light leading-tight tracking-normal text-[var(--t1)] outline-none placeholder:text-[var(--t3)]"
+          style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
           placeholder="Untitled"
         />
         {metaItems.length > 0 ? (
