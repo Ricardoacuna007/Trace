@@ -14,11 +14,13 @@ export interface CodeOutput {
   stderr: string
   status: number | null
   timedOut: boolean
+  cancelled: boolean
   durationMs: number
   truncated: boolean
 }
 
 interface CodeRunnerState {
+  cancelBlock: (blockId: string) => Promise<void>
   canRun: (language: string) => boolean
   detectionError: string | null
   isDesktop: boolean
@@ -26,6 +28,11 @@ interface CodeRunnerState {
   results: Record<string, CodeOutput>
   runBlock: (block: CodeBlockSnippet) => Promise<void>
   runtimes: RuntimeInfo[]
+}
+
+interface RunningRun {
+  blockId: string
+  runId: string
 }
 
 const TRUST_KEY = 'trace-code-runner-confirmed'
@@ -84,7 +91,7 @@ function confirmExecution(): boolean {
 export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_RUNNER_SETTINGS): CodeRunnerState {
   const [runtimes, setRuntimes] = useState<RuntimeInfo[]>([])
   const [results, setResults] = useState<Record<string, CodeOutput>>({})
-  const [runningBlockId, setRunningBlockId] = useState<string | null>(null)
+  const [runningRun, setRunningRun] = useState<RunningRun | null>(null)
   const [detectionError, setDetectionError] = useState<string | null>(null)
   const isDesktop = isTauri()
 
@@ -134,6 +141,7 @@ export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_R
           stderr: 'La ejecucion de codigo solo esta disponible en Trace Desktop.',
           status: null,
           timedOut: false,
+          cancelled: false,
           durationMs: 0,
           truncated: false,
         },
@@ -149,6 +157,7 @@ export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_R
           stderr: `${block.language} no esta instalado o no esta en PATH.`,
           status: null,
           timedOut: false,
+          cancelled: false,
           durationMs: 0,
           truncated: false,
         },
@@ -160,7 +169,8 @@ export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_R
       return
     }
 
-    setRunningBlockId(block.id)
+    const runId = `${block.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    setRunningRun({ blockId: block.id, runId })
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       const output = await invoke<CodeOutput>('run_code_block', {
@@ -168,6 +178,7 @@ export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_R
         code: block.code,
         timeoutMs: settings.timeout_ms,
         maxOutputChars: settings.max_output_chars,
+        runId,
       })
       setResults((current) => ({
         ...current,
@@ -181,20 +192,46 @@ export function useCodeRunner(settings: TraceCodeRunnerSettings = DEFAULT_CODE_R
           stderr: error instanceof Error ? error.message : 'No se pudo ejecutar el bloque.',
           status: null,
           timedOut: false,
+          cancelled: false,
           durationMs: 0,
           truncated: false,
         },
       }))
     } finally {
-      setRunningBlockId(null)
+      setRunningRun((current) => (current?.runId === runId ? null : current))
     }
   }, [canRun, isDesktop, settings.max_output_chars, settings.timeout_ms])
 
+  const cancelBlock = useCallback(async (blockId: string) => {
+    if (!isDesktop || runningRun?.blockId !== blockId) {
+      return
+    }
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke<boolean>('cancel_code_block', { runId: runningRun.runId })
+    } catch (error) {
+      setResults((current) => ({
+        ...current,
+        [blockId]: {
+          stdout: '',
+          stderr: error instanceof Error ? error.message : 'No se pudo detener el bloque.',
+          status: null,
+          timedOut: false,
+          cancelled: false,
+          durationMs: 0,
+          truncated: false,
+        },
+      }))
+    }
+  }, [isDesktop, runningRun])
+
   return {
+    cancelBlock,
     canRun,
     detectionError,
     isDesktop,
-    isRunning: (blockId) => runningBlockId === blockId,
+    isRunning: (blockId) => runningRun?.blockId === blockId,
     results,
     runBlock,
     runtimes,

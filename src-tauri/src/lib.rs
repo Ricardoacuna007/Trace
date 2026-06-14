@@ -5,6 +5,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             commands::graph::generate_graph_data,
+            commands::code_runner::cancel_code_block,
             commands::code_runner::detect_runtimes,
             commands::code_runner::run_code_block,
             commands::customization::read_vault_customization,

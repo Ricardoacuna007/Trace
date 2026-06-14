@@ -24,6 +24,9 @@ function blockIdForElement(element: HTMLElement): string | null {
 }
 
 function outputStatus(output: CodeOutput): string {
+  if (output.cancelled) {
+    return `cancelado en ${output.durationMs}ms`
+  }
   if (output.timedOut) {
     return `timeout en ${output.durationMs}ms`
   }
@@ -209,13 +212,21 @@ export function useInlineCodeRunner(
         button.className = 'trace-code-runner-inline-button'
         const canRun = runner.canRun(snippet.language)
         const running = runner.isRunning(snippet.id)
-        button.disabled = !canRun || running
-        button.textContent = running ? 'Running' : 'Run'
-        button.title = canRun ? `Ejecutar ${snippet.language}` : `${snippet.language} no disponible`
+        button.disabled = !running && !canRun
+        button.textContent = running ? 'Stop' : 'Run'
+        button.title = running
+          ? `Detener ${snippet.language}`
+          : canRun
+            ? `Ejecutar ${snippet.language}`
+            : `${snippet.language} no disponible`
         button.setAttribute('aria-label', button.title)
         button.addEventListener('click', (event) => {
           event.preventDefault()
           event.stopPropagation()
+          if (running) {
+            void runner.cancelBlock(snippet.id)
+            return
+          }
           void runner.runBlock(snippet)
         })
 

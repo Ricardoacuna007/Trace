@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Loader2, Play, Terminal } from 'lucide-react'
+import { AlertTriangle, Check, Play, Square, Terminal } from 'lucide-react'
 import { useMemo } from 'react'
 import type { TraceCodeRunnerSettings } from '../../lib/db'
 import { extractCodeBlocks } from './codeBlocks'
@@ -11,6 +11,9 @@ interface CodeRunnerSectionProps {
 }
 
 function outputLabel(output: CodeOutput): string {
+  if (output.cancelled) {
+    return `cancelado en ${output.durationMs}ms`
+  }
   if (output.timedOut) {
     return `timeout en ${output.durationMs}ms`
   }
@@ -51,12 +54,18 @@ export function CodeRunnerSection({ content, settings }: CodeRunnerSectionProps)
               </div>
               <button
                 type="button"
-                disabled={!canRun || running}
+                disabled={!running && !canRun}
                 className="flex h-6 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[rgba(94,139,255,0.3)] bg-[var(--accent-glow)] px-2 text-[10px] font-medium text-[var(--accent)] transition-colors hover:bg-[rgba(94,139,255,0.2)] disabled:cursor-not-allowed disabled:border-[var(--border)] disabled:bg-[var(--bg2)] disabled:text-[var(--t3)]"
-                onClick={() => void runner.runBlock(snippet)}
+                onClick={() => {
+                  if (running) {
+                    void runner.cancelBlock(snippet.id)
+                    return
+                  }
+                  void runner.runBlock(snippet)
+                }}
               >
-                {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                Run
+                {running ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                {running ? 'Stop' : 'Run'}
               </button>
             </div>
 
@@ -67,7 +76,7 @@ export function CodeRunnerSection({ content, settings }: CodeRunnerSectionProps)
             {result ? (
               <div className="mt-2 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border)] bg-black/25">
                 <div className="flex items-center gap-1.5 border-b border-[var(--border)] px-2 py-1 font-mono text-[10px] text-[var(--t3)]">
-                  {result.status === 0 && !result.timedOut ? (
+                  {result.status === 0 && !result.timedOut && !result.cancelled ? (
                     <Check className="h-3 w-3 text-[var(--green)]" />
                   ) : (
                     <AlertTriangle className="h-3 w-3 text-[var(--amber)]" />

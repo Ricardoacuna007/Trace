@@ -1,11 +1,12 @@
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     env,
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::{Mutex, OnceLock},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -14,6 +15,7 @@ const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const MAX_OUTPUT_CHARS: usize = 10_000;
 const MIN_OUTPUT_CHARS: usize = 1_000;
 const HARD_MAX_OUTPUT_CHARS: usize = 50_000;
+static CANCELLED_RUNS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +32,7 @@ pub struct CodeOutput {
     stderr: String,
     status: Option<i32>,
     timed_out: bool,
+    cancelled: bool,
     duration_ms: u128,
     truncated: bool,
 }
@@ -114,6 +117,7 @@ pub fn run_code_block(
     code: String,
     timeout_ms: Option<u64>,
     max_output_chars: Option<usize>,
+    run_id: Option<String>,
 ) -> Result<CodeOutput, String> {
     let runtime = runtime_for_language(&language)
         .ok_or_else(|| format!("No hay runtime configurado para '{language}'."))?;
@@ -131,11 +135,53 @@ pub fn run_code_block(
     let output_limit = max_output_chars
         .unwrap_or(MAX_OUTPUT_CHARS)
         .clamp(MIN_OUTPUT_CHARS, HARD_MAX_OUTPUT_CHARS);
+    let run_id = run_id.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
     match runtime.kind {
-        RuntimeKind::File => run_file_runtime(runtime, &command_path, &code, timeout, output_limit),
-        RuntimeKind::Shell => run_shell_runtime(runtime, &command_path, &code, timeout, output_limit),
-        RuntimeKind::Rust => run_rust_runtime(runtime, &command_path, &code, timeout, output_limit),
+        RuntimeKind::File => run_file_runtime(
+            runtime,
+            &command_path,
+            &code,
+            timeout,
+            output_limit,
+            run_id.as_deref(),
+        ),
+        RuntimeKind::Shell => run_shell_runtime(
+            runtime,
+            &command_path,
+            &code,
+            timeout,
+            output_limit,
+            run_id.as_deref(),
+        ),
+        RuntimeKind::Rust => run_rust_runtime(
+            runtime,
+            &command_path,
+            &code,
+            timeout,
+            output_limit,
+            run_id.as_deref(),
+        ),
     }
+}
+
+#[tauri::command]
+pub fn cancel_code_block(run_id: String) -> Result<bool, String> {
+    let run_id = run_id.trim();
+    if run_id.is_empty() {
+        return Err("run_id vacio.".to_string());
+    }
+
+    let mut cancelled = cancelled_runs()
+        .lock()
+        .map_err(|_| "No se pudo marcar la ejecucion como cancelada.".to_string())?;
+    Ok(cancelled.insert(run_id.to_string()))
 }
 
 fn runtime_for_language(language: &str) -> Option<&'static RuntimeSpec> {
@@ -151,11 +197,12 @@ fn run_file_runtime(
     code: &str,
     timeout: Duration,
     output_limit: usize,
+    run_id: Option<&str>,
 ) -> Result<CodeOutput, String> {
     let script_path = write_temp_file(runtime.extension, code)?;
     let mut command = Command::new(command_path);
     command.arg(&script_path);
-    let output = run_with_timeout(command, timeout, output_limit);
+    let output = run_with_timeout(command, timeout, output_limit, run_id);
     let _ = fs::remove_file(script_path);
     output
 }
@@ -166,6 +213,7 @@ fn run_shell_runtime(
     code: &str,
     timeout: Duration,
     output_limit: usize,
+    run_id: Option<&str>,
 ) -> Result<CodeOutput, String> {
     let mut command = Command::new(command_path);
     if runtime.language == "powershell" {
@@ -173,7 +221,7 @@ fn run_shell_runtime(
     } else {
         command.args(["-c", code]);
     }
-    run_with_timeout(command, timeout, output_limit)
+    run_with_timeout(command, timeout, output_limit, run_id)
 }
 
 fn run_rust_runtime(
@@ -182,20 +230,21 @@ fn run_rust_runtime(
     code: &str,
     timeout: Duration,
     output_limit: usize,
+    run_id: Option<&str>,
 ) -> Result<CodeOutput, String> {
     let source_path = write_temp_file(runtime.extension, code)?;
     let binary_path = source_path.with_extension(if cfg!(windows) { "exe" } else { "bin" });
 
     let mut compile = Command::new(command_path);
     compile.arg(&source_path).arg("-o").arg(&binary_path);
-    let compile_output = run_with_timeout(compile, timeout, output_limit)?;
+    let compile_output = run_with_timeout(compile, timeout, output_limit, run_id)?;
     if compile_output.timed_out || compile_output.status != Some(0) {
         let _ = fs::remove_file(source_path);
         let _ = fs::remove_file(binary_path);
         return Ok(compile_output);
     }
 
-    let output = run_with_timeout(Command::new(&binary_path), timeout, output_limit);
+    let output = run_with_timeout(Command::new(&binary_path), timeout, output_limit, run_id);
     let _ = fs::remove_file(source_path);
     let _ = fs::remove_file(binary_path);
     output
@@ -205,6 +254,7 @@ fn run_with_timeout(
     mut command: Command,
     timeout: Duration,
     output_limit: usize,
+    run_id: Option<&str>,
 ) -> Result<CodeOutput, String> {
     let start = Instant::now();
     let mut child = command
@@ -215,6 +265,7 @@ fn run_with_timeout(
         .map_err(|error| format!("No se pudo ejecutar el bloque: {error}"))?;
 
     let mut timed_out = false;
+    let mut cancelled = false;
     loop {
         if child
             .try_wait()
@@ -230,6 +281,12 @@ fn run_with_timeout(
             break;
         }
 
+        if run_id.is_some_and(is_cancelled) {
+            cancelled = true;
+            let _ = child.kill();
+            break;
+        }
+
         thread::sleep(Duration::from_millis(25));
     }
 
@@ -237,18 +294,42 @@ fn run_with_timeout(
         .wait_with_output()
         .map_err(|error| format!("No se pudo leer la salida del proceso: {error}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if cancelled && stderr.trim().is_empty() {
+        stderr = "[trace: ejecucion cancelada]".to_string();
+    }
     let (stdout, stdout_truncated) = truncate_output(stdout, output_limit);
     let (stderr, stderr_truncated) = truncate_output(stderr, output_limit);
+    clear_cancelled(run_id);
 
     Ok(CodeOutput {
         stdout,
         stderr,
         status: output.status.code(),
         timed_out,
+        cancelled,
         duration_ms: start.elapsed().as_millis(),
         truncated: stdout_truncated || stderr_truncated,
     })
+}
+
+fn cancelled_runs() -> &'static Mutex<HashSet<String>> {
+    CANCELLED_RUNS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn is_cancelled(run_id: &str) -> bool {
+    cancelled_runs()
+        .lock()
+        .map(|cancelled| cancelled.contains(run_id))
+        .unwrap_or(false)
+}
+
+fn clear_cancelled(run_id: Option<&str>) {
+    if let Some(run_id) = run_id {
+        if let Ok(mut cancelled) = cancelled_runs().lock() {
+            cancelled.remove(run_id);
+        }
+    }
 }
 
 fn truncate_output(value: String, output_limit: usize) -> (String, bool) {
