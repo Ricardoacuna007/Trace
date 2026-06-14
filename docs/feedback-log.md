@@ -113,3 +113,27 @@ Seguimiento:
 
 - Import/export Markdown web, carpetas, conexiones y personalizacion visual web ya tienen endpoints/acciones reales en rama `codex/v0.3`.
 - La bandeja de entrada web ya puede procesar notas moviendolas a carpetas sugeridas.
+
+### FEEDBACK-006 - Sugerencias inteligentes deben vivir en core
+
+Tipo: arquitectura / calidad de producto
+Prioridad: P0
+Version reportada: v0.3 en desarrollo
+Origen: revision de release
+Estado: resuelto en rama `codex/v0.3`
+
+Problema:
+
+Las sugerencias de conexiones eran utiles visualmente, pero no cumplian la promesa de v0.3 si dependian solo de heuristicas del frontend. La feature principal necesitaba calcularse sobre SQLite/FTS5 en Rust para que desktop y self-host compartan la misma logica.
+
+Solucion aplicada:
+
+- `trace-core` expone `suggest_connections(...)` con TF-IDF local sobre el corpus indexado en `nodes_fts`.
+- El servidor self-host expone `GET /api/notes/:id/suggestions`.
+- Desktop llama el mismo core mediante el comando Tauri `suggest_note_connections`.
+- El panel derecho usa la fuente nativa y conserva el algoritmo frontend solo como fallback.
+
+Seguimiento:
+
+- Probar relevancia con vaults reales antes de taggear `v0.3.0`.
+- Mantener QA de Windows instalado y Docker real como bloqueo de release.

@@ -18,6 +18,7 @@ pub fn run() {
             commands::quick_capture::create_inbox_note,
             commands::search::search_notes,
             commands::search::get_backlinks,
+            commands::suggestions::suggest_note_connections,
             commands::vault::get_active_vault,
             commands::vault::set_active_vault
         ])

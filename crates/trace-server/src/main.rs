@@ -40,7 +40,7 @@ use trace_core::{
     notes::{
         self, CreateFolderInput, CreateNoteInput, DeletedResponse, MoveNodeInput, UpdateNoteInput,
     },
-    schema,
+    schema, suggestions,
 };
 use uuid::Uuid;
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
@@ -158,6 +158,11 @@ struct IgnoreSuggestionRequest {
 }
 
 #[derive(Deserialize)]
+struct SuggestionQuery {
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize)]
 struct AuditLogQuery {
     limit: Option<u32>,
     offset: Option<u32>,
@@ -240,6 +245,7 @@ fn build_router(state: AppState) -> Router {
                 .put(api_update_note)
                 .delete(api_delete_note),
         )
+        .route("/api/notes/:id/suggestions", get(api_suggest_connections))
         .route("/api/relations", get(api_list_relations))
         .route("/api/relations/connect", post(api_connect_notes))
         .route("/api/relations/disconnect", post(api_disconnect_notes))
@@ -753,6 +759,20 @@ async fn api_ignore_suggestion(
             .context("No se pudo ignorar sugerencia")
     }) {
         Ok(relations) => Json(relations).into_response(),
+        Err(error) => server_error(error),
+    }
+}
+
+async fn api_suggest_connections(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(query): Query<SuggestionQuery>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        suggestions::suggest_connections(&connection, &id, query.limit)
+            .context("No se pudieron calcular sugerencias")
+    }) {
+        Ok(items) => Json(items).into_response(),
         Err(error) => server_error(error),
     }
 }

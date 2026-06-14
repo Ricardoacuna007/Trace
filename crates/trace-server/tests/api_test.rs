@@ -302,6 +302,73 @@ async fn test_markdown_export_import_zip() {
 }
 
 #[tokio::test]
+async fn test_connection_suggestions_rank_related_notes() {
+    let server = TestServer::start().await;
+    let client = Client::builder()
+        .cookie_store(true)
+        .build()
+        .expect("client builds");
+    let auth = setup_admin(&server, &client).await;
+    let token = auth["token"].as_str().expect("token exists");
+
+    let source = client
+        .post(format!("{}/api/notes", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({
+            "title": "Trace server",
+            "content": "[{\"type\":\"paragraph\",\"content\":\"Docker self host sqlite backup restore\"}]",
+            "tags": []
+        }))
+        .send()
+        .await
+        .expect("source responds")
+        .json::<Value>()
+        .await
+        .expect("source json");
+    let source_id = source["id"].as_str().expect("source id");
+
+    client
+        .post(format!("{}/api/notes", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({
+            "title": "Self host backups",
+            "content": "[{\"type\":\"paragraph\",\"content\":\"Docker compose backup restore sqlite vault\"}]",
+            "tags": []
+        }))
+        .send()
+        .await
+        .expect("related responds");
+    client
+        .post(format!("{}/api/notes", server.base_url))
+        .bearer_auth(token)
+        .json(&json!({
+            "title": "Cooking",
+            "content": "[{\"type\":\"paragraph\",\"content\":\"Pasta tomato basil\"}]",
+            "tags": []
+        }))
+        .send()
+        .await
+        .expect("unrelated responds");
+
+    let suggestions = client
+        .get(format!(
+            "{}/api/notes/{source_id}/suggestions?limit=5",
+            server.base_url
+        ))
+        .bearer_auth(token)
+        .send()
+        .await
+        .expect("suggestions respond");
+    assert_eq!(suggestions.status(), StatusCode::OK);
+    let body = suggestions.json::<Value>().await.expect("suggestions json");
+    let first_title = body
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|item| item["title"].as_str());
+    assert_eq!(first_title, Some("Self host backups"));
+}
+
+#[tokio::test]
 async fn test_web_customization_persists_and_validates_json() {
     let server = TestServer::start().await;
     let client = Client::builder()

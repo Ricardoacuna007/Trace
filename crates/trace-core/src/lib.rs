@@ -4,3 +4,4 @@ pub mod graph;
 pub mod models;
 pub mod notes;
 pub mod schema;
+pub mod suggestions;

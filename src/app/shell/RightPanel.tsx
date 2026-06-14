@@ -1,8 +1,9 @@
 import { Check, FileText, Folder, MoveRight, Network, Sigma, Sparkles, X } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CodeRunnerSection } from '../../features/code-runner/CodeRunnerSection'
 import { suggestInboxDestinations, type InboxDestination } from '../../features/inbox/destinations'
 import { suggestConnections, type ConnectionSuggestion } from '../../features/notes-connections/suggestions'
+import { loadNativeConnectionSuggestions, nativeToConnectionSuggestions } from '../../features/notes-connections/suggestionsClient'
 import {
   buildBacklinkItems,
   countWords,
@@ -249,12 +250,41 @@ export function RightPanel({
   const words = countWords(note.content)
   const outgoing = noteRelations.filter((relation) => relation.sourceId === note.id).length
   const ignoredPairs = useMemo(() => new Set(ignoredSuggestionPairs), [ignoredSuggestionPairs])
-  const suggestions = useMemo(() => (
+  const fallbackSuggestions = useMemo(() => (
     suggestConnections(note, nodes, noteRelations, ignoredPairs)
   ), [ignoredPairs, nodes, note, noteRelations])
+  const [nativeSuggestions, setNativeSuggestions] = useState<{
+    noteId: string
+    items: ConnectionSuggestion[]
+  } | null>(null)
   const inboxDestinations = useMemo(() => (
     suggestInboxDestinations(note, nodes, noteRelations)
   ), [nodes, note, noteRelations])
+  const suggestions = nativeSuggestions?.noteId === note.id ? nativeSuggestions.items : fallbackSuggestions
+
+  useEffect(() => {
+    let cancelled = false
+
+    loadNativeConnectionSuggestions(note.id, 5)
+      .then((items) => {
+        if (cancelled) {
+          return
+        }
+        setNativeSuggestions({
+          noteId: note.id,
+          items: nativeToConnectionSuggestions(note.id, items, nodes, noteRelations, ignoredPairs),
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNativeSuggestions(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [ignoredPairs, nodes, note.id, noteRelations])
 
   return (
     <aside className="trace-scrollbar hidden h-full w-[var(--right-panel-w)] shrink-0 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg2)] xl:block">

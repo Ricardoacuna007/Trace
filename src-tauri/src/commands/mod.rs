@@ -6,4 +6,5 @@ pub mod markdown_io;
 pub mod quick_capture;
 pub mod schema;
 pub mod search;
+pub mod suggestions;
 pub mod vault;
