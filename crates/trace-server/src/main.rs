@@ -1,4 +1,5 @@
 mod audit;
+mod markdown;
 mod sync;
 
 use std::{
@@ -219,9 +220,15 @@ fn build_router(state: AppState) -> Router {
         .route("/api/relations", get(api_list_relations))
         .route("/api/relations/connect", post(api_connect_notes))
         .route("/api/relations/disconnect", post(api_disconnect_notes))
-        .route("/api/suggestions/ignored", get(api_list_ignored_suggestions))
+        .route(
+            "/api/suggestions/ignored",
+            get(api_list_ignored_suggestions),
+        )
         .route("/api/suggestions/ignore", post(api_ignore_suggestion))
         .route("/api/graph", get(api_graph))
+        .route("/api/export/note/:id", get(api_export_note_markdown))
+        .route("/api/export/vault", get(api_export_vault_markdown))
+        .route("/api/import/markdown", post(api_import_markdown_zip))
         .route("/api/backup", post(api_backup))
         .route("/api/backup/history", get(api_backup_history))
         .route("/api/restore", post(api_restore))
@@ -710,6 +717,39 @@ async fn api_graph(State(state): State<AppState>) -> Response {
     }) {
         Ok(graph) => Json(graph).into_response(),
         Err(error) => server_error(error),
+    }
+}
+
+async fn api_export_note_markdown(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        markdown::export_note_markdown(&connection, &id)
+            .context("No se pudo exportar nota Markdown")
+    }) {
+        Ok(export) => download_response(export),
+        Err(error) => markdown_error_response(error),
+    }
+}
+
+async fn api_export_vault_markdown(State(state): State<AppState>) -> Response {
+    match open_connection(&state.db_path).and_then(|connection| {
+        markdown::export_vault_markdown_zip(&connection)
+            .context("No se pudo exportar vault Markdown")
+    }) {
+        Ok(export) => download_response(export),
+        Err(error) => markdown_error_response(error),
+    }
+}
+
+async fn api_import_markdown_zip(State(state): State<AppState>, body: Bytes) -> Response {
+    match open_connection(&state.db_path).and_then(|mut connection| {
+        markdown::import_markdown_zip(&mut connection, &body)
+            .context("No se pudo importar ZIP Markdown")
+    }) {
+        Ok(summary) => Json(summary).into_response(),
+        Err(error) => markdown_error_response(error),
     }
 }
 
@@ -1446,6 +1486,22 @@ fn not_found(message: &str) -> Response {
     (StatusCode::NOT_FOUND, Json(error_body(message))).into_response()
 }
 
+fn download_response(export: markdown::MarkdownExport) -> Response {
+    let mut response = export.bytes.into_response();
+    if let Ok(value) = HeaderValue::from_str(export.content_type) {
+        response.headers_mut().insert(header::CONTENT_TYPE, value);
+    }
+    if let Ok(value) = HeaderValue::from_str(&format!(
+        "attachment; filename=\"{}\"",
+        export.filename.replace('"', "")
+    )) {
+        response
+            .headers_mut()
+            .insert(header::CONTENT_DISPOSITION, value);
+    }
+    response
+}
+
 fn error_body(message: &str) -> serde_json::Value {
     serde_json::json!({ "error": message })
 }
@@ -1457,6 +1513,29 @@ fn server_error(error: anyhow::Error) -> Response {
         Json(error_body("Error interno del servidor")),
     )
         .into_response()
+}
+
+fn markdown_error_response(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if message.contains("No se encontro la nota solicitada") {
+        return not_found("Nota no encontrada");
+    }
+    if is_markdown_bad_request(&message) {
+        return (StatusCode::BAD_REQUEST, Json(error_body(&message))).into_response();
+    }
+
+    server_error(error)
+}
+
+fn is_markdown_bad_request(message: &str) -> bool {
+    [
+        "El ZIP de Markdown esta vacio",
+        "El ZIP de Markdown no es valido",
+        "El ZIP no contiene archivos .md",
+        "El ZIP de Markdown excede el limite",
+    ]
+    .iter()
+    .any(|prefix| message.contains(prefix))
 }
 
 fn restore_error_response(error: anyhow::Error) -> Response {

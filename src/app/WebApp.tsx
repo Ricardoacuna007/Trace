@@ -5,7 +5,7 @@ import type { NoteGraphData } from '../features/notes-graph/graph'
 import { previewFromContent } from '../features/notes-editor/contentMetrics'
 import { clearAccessToken, setAccessToken } from '../lib/auth'
 import { parseTraceConfig, type NoteBacklink, type TraceUIModules } from '../lib/db'
-import { apiJson, readJson, refreshAccessToken } from '../lib/http'
+import { apiFetch, apiJson, readJson, refreshAccessToken } from '../lib/http'
 import { withTree } from '../lib/workspace/nodeTree'
 import type { AppViewMode, NoteRelation, SaveStatus, ViewMode } from '../store/types'
 import type { Note } from '../types/note'
@@ -27,6 +27,13 @@ interface AuthResponse {
 
 interface SetupStatusResponse {
   setup_required: boolean
+}
+
+interface ImportSummary {
+  workspaceId: string
+  workspaceTitle: string
+  importedNotes: number
+  createdRelations: number
 }
 
 interface FormState {
@@ -100,6 +107,7 @@ function mergeRelations(current: NoteRelation[], incoming: NoteRelation[]): Note
 export function WebApp() {
   const saveTimerRef = useRef<number | null>(null)
   const queuedNoteRef = useRef<Note | null>(null)
+  const importMarkdownInputRef = useRef<HTMLInputElement | null>(null)
   const [path, setPath] = useState(() => window.location.pathname)
   const [mode, setMode] = useState<AuthMode>('loading')
   const [form, setForm] = useState<FormState>({
@@ -379,6 +387,75 @@ export function WebApp() {
     }
   }, [])
 
+  const downloadHttpResponse = useCallback(async (response: Response, fallbackFilename: string) => {
+    if (!response.ok) {
+      throw new Error(await responseErrorMessage(response))
+    }
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = downloadFilename(response.headers.get('content-disposition'), fallbackFilename)
+    link.click()
+    URL.revokeObjectURL(objectUrl)
+  }, [])
+
+  const exportCurrentNoteMarkdown = useCallback(async () => {
+    if (!selectedNote) {
+      setMessage('Selecciona una nota para exportar.')
+      return
+    }
+
+    setBusy(true)
+    setMessage(null)
+    try {
+      const response = await apiFetch(`/api/export/note/${encodeURIComponent(selectedNote.id)}`)
+      await downloadHttpResponse(response, `${safeDownloadName(selectedNote.title)}.md`)
+      setMessage('Nota exportada en Markdown')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo exportar la nota')
+    } finally {
+      setBusy(false)
+    }
+  }, [downloadHttpResponse, selectedNote])
+
+  const exportVaultMarkdown = useCallback(async () => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const response = await apiFetch('/api/export/vault')
+      await downloadHttpResponse(response, 'trace-markdown.zip')
+      setMessage('Vault exportado en Markdown')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo exportar el vault')
+    } finally {
+      setBusy(false)
+    }
+  }, [downloadHttpResponse])
+
+  const triggerImportMarkdown = useCallback(() => {
+    importMarkdownInputRef.current?.click()
+  }, [])
+
+  const importMarkdownZip = useCallback(async (file: File) => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const summary = await apiJson<ImportSummary>('/api/import/markdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: file,
+      })
+      await loadWorkspace()
+      setMessage(`Importacion completada: ${summary.importedNotes} notas y ${summary.createdRelations} relaciones.`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo importar Markdown')
+    } finally {
+      setBusy(false)
+    }
+  }, [loadWorkspace])
+
   const updateSelectedNote = useCallback((updater: (note: Note) => Note) => {
     const currentNote = selectedNote
     if (!currentNote) {
@@ -566,9 +643,28 @@ export function WebApp() {
         }}
         onOpenConnect={() => setWebConnectOpen(true)}
         onOpenSettings={() => navigate('/settings')}
-        onExportMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}
+        onExportMarkdown={() => {
+          if (selectedNote) {
+            void exportCurrentNoteMarkdown()
+            return
+          }
+          void exportVaultMarkdown()
+        }}
       />
       <AppErrorBanner error={message} />
+      <input
+        ref={importMarkdownInputRef}
+        type="file"
+        accept=".zip,application/zip"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          if (file) {
+            void importMarkdownZip(file)
+          }
+        }}
+      />
       {webConnectOpen ? (
         <WebConnectNoteModal
           activeNote={selectedNote}
@@ -625,9 +721,9 @@ export function WebApp() {
         onMoveNode={() => setMessage('Procesar bandeja desde web se agregara al flujo unificado.')}
         onCreateFolder={() => void createFolder()}
         onCreateNote={() => void createNote()}
-        onExportCurrentNoteMarkdown={() => setMessage('Exportar Markdown desde web se agregara despues.')}
-        onExportVaultMarkdown={() => setMessage('Exportar vault desde web se agregara despues.')}
-        onImportMarkdown={() => setMessage('Importar Markdown desde web se agregara despues.')}
+        onExportCurrentNoteMarkdown={() => void exportCurrentNoteMarkdown()}
+        onExportVaultMarkdown={() => void exportVaultMarkdown()}
+        onImportMarkdown={triggerImportMarkdown}
         onOpenCommandPalette={() => setCommandOpen(true)}
         onOpenConnectModal={() => setWebConnectOpen(true)}
         onOpenNode={selectNode}
@@ -664,4 +760,39 @@ export function WebApp() {
       </button>
     </main>
   )
+}
+
+async function responseErrorMessage(response: Response): Promise<string> {
+  const text = await response.text()
+  if (!text.trim()) {
+    return `HTTP ${response.status}`
+  }
+
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown }
+    if (typeof parsed.error === 'string' && parsed.error.trim()) {
+      return parsed.error
+    }
+  } catch {
+    return text
+  }
+
+  return text
+}
+
+function downloadFilename(contentDisposition: string | null, fallback: string): string {
+  const filename = contentDisposition?.match(/filename="([^"]+)"/)?.[1]
+  return filename?.trim() || fallback
+}
+
+function safeDownloadName(value: string): string {
+  const cleaned = Array.from(value.trim())
+    .map((char) => {
+      const invalid = '<>:"/\\|?*'.includes(char) || char.charCodeAt(0) < 32
+      return invalid ? '_' : char
+    })
+    .join('')
+    .replace(/^\.+|\.+$/g, '')
+
+  return cleaned || 'untitled'
 }
