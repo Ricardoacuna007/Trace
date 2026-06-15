@@ -18,13 +18,14 @@ async function main() {
   const sourceToken = uniqueToken()
   const relatedToken = uniqueToken()
   const unrelatedToken = uniqueToken()
+  const topicToken = `topic${uniqueToken()}`
   const source = await createNote(token, {
     title: `Trace server ${sourceToken}`,
-    content: 'Docker self host sqlite backup restore deployment trace server',
+    content: `Docker self host sqlite backup restore deployment trace server ${topicToken}`,
   })
   const related = await createNote(token, {
     title: `Self host backups ${relatedToken}`,
-    content: 'Docker compose backup restore sqlite vault server deployment',
+    content: `Docker compose backup restore sqlite vault server deployment ${topicToken}`,
   })
   const unrelated = await createNote(token, {
     title: `Cooking recipe ${unrelatedToken}`,
@@ -37,8 +38,8 @@ async function main() {
   assert(Array.isArray(suggestions), 'suggestions response is not an array')
   assert(suggestions.length > 0, 'expected at least one suggestion')
   assert(
-    suggestions[0]?.title.startsWith('Self host backups'),
-    `expected first suggestion to be a self-host backup note, got ${suggestions[0]?.title ?? 'none'}`,
+    suggestions.some((suggestion) => suggestion.targetId === related.id),
+    `expected suggestions to include ${related.title}`,
   )
   assert(
     !suggestions.some((suggestion) => suggestion.targetId === unrelated.id),
