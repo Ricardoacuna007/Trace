@@ -30,8 +30,8 @@ Ver checklist completo en `docs/v0.3-release-qa.md`.
 ## Crear version
 
 ```bash
-git tag v0.2.4
-git push origin v0.2.4
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 El workflow `Build Linux Desktop` crea un release draft y adjunta:
@@ -49,7 +49,7 @@ El workflow `Build Windows Desktop` adjunta al mismo release draft:
 El workflow `Publish Docker Image` publica:
 
 - `ghcr.io/ricardoacuna007/trace-server:latest`
-- `ghcr.io/ricardoacuna007/trace-server:v0.2.4`
+- `ghcr.io/ricardoacuna007/trace-server:v0.3.0`
 
 ## Publicar
 

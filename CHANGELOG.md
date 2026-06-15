@@ -2,6 +2,43 @@
 
 Todos los cambios notables de Trace se registran aqui.
 
+## 0.3.0 - 2026-06-14
+
+Release de v0.3 "La app que piensa contigo".
+
+### Agregado
+
+- Captura rapida global con `Ctrl+Space` y bandeja de entrada.
+- Vista inteligente de workspace para retomar la ultima sesion.
+- Sugerencias inteligentes de conexiones en `trace-core` usando TF-IDF sobre
+  SQLite FTS5, compartidas por desktop y self-host.
+- Panel derecho con posibles conexiones, aceptar/ignorar y fallback frontend.
+- Code runner local para bloques de codigo, con deteccion de runtimes y
+  cancelacion de ejecuciones largas.
+- Controles visuales de apariencia para editor, layout y grafo.
+- Grafo accionable con clusters, estados visuales y etiquetas persistentes.
+- Flujo self-host web mas completo: carpetas, conexiones, bandeja,
+  personalizacion, import/export Markdown y backup/restore.
+- Auditor de sugerencias para vaults reales:
+  `cargo run -p trace-core --example suggestion_audit -- <trace.db> 30 5`.
+- Smoke test self-host automatizado para Docker con notas, sugerencias,
+  relaciones, backup, restore y audit log.
+
+### Cambiado
+
+- Desktop y self-host ahora comparten el algoritmo de sugerencias desde
+  `trace-core`, evitando divergencia entre runtimes.
+- El proceso de release exige gate de QA v0.3 antes de publicar instaladores.
+- Titulos largos de notas tienen mejor manejo visual en el editor y superficies
+  compactas.
+
+### Pendiente conocido
+
+- Los instaladores siguen sin firma de codigo.
+- Validar artefactos generados por GitHub Actions antes de publicar el release
+  draft.
+- MCP de Trace queda para `v0.3.x` o `v0.4`; no bloquea esta version.
+
 ## 0.2.4 - 2026-06-06
 
 Patch de feedback de testers.
