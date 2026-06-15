@@ -15,6 +15,7 @@ on:
       - "playwright.config.ts"
       - "scripts/prepare-server-web.mjs"
       - "scripts/e2e-server.mjs"
+      - "scripts/self-host-smoke.mjs"
       - "src/**"
       - "tests/e2e/**"
       - "tsconfig*.json"
@@ -32,6 +33,7 @@ on:
       - "playwright.config.ts"
       - "scripts/prepare-server-web.mjs"
       - "scripts/e2e-server.mjs"
+      - "scripts/self-host-smoke.mjs"
       - "src/**"
       - "tests/e2e/**"
       - "tsconfig*.json"
@@ -49,11 +51,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Build image
         run: docker build --pull -t trace-self-host:ci .
 
+      - name: Create test volume
+        run: docker volume create trace-self-host-ci-data
+
       - name: Run container
-        run: docker run --rm -d --name trace-self-host-ci -p 18080:8080 trace-self-host:ci
+        run: docker run -d --name trace-self-host-ci -p 18080:8080 -v trace-self-host-ci-data:/data trace-self-host:ci
 
       - name: Wait for health check
         run: |
@@ -66,13 +76,40 @@ jobs:
           docker logs trace-self-host-ci
           exit 1
 
+      - name: Run self-host smoke test
+        run: npm run smoke:self-host
+
+      - name: Restart container with same volume
+        run: |
+          docker stop trace-self-host-ci
+          docker rm trace-self-host-ci
+          docker run -d --name trace-self-host-ci -p 18080:8080 -v trace-self-host-ci-data:/data trace-self-host:ci
+
+      - name: Wait for restarted health check
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs trace-self-host-ci
+          exit 1
+
+      - name: Run self-host smoke test after restart
+        run: npm run smoke:self-host
+
       - name: Show server logs
         if: always()
         run: docker logs trace-self-host-ci || true
 
       - name: Stop container
         if: always()
-        run: docker stop trace-self-host-ci || true
+        run: docker rm -f trace-self-host-ci || true
+
+      - name: Remove test volume
+        if: always()
+        run: docker volume rm trace-self-host-ci-data || true
 
   e2e:
     name: Web E2E tests

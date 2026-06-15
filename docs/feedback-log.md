@@ -155,3 +155,16 @@ Decision:
 - No taggear `v0.3.0` hasta completar `docs/v0.3-release-qa.md`.
 - Usar el auditor `cargo run -p trace-core --example suggestion_audit -- <trace.db> 30 5` para revisar sugerencias con vault real.
 - Validar Windows instalado limpio y Docker end-to-end antes de generar release final.
+- El workflow Docker debe ejecutar `npm run smoke:self-host`, no solo validar `/health`.
+
+### FEEDBACK-008 - MCP de Trace despues del gate de release
+
+Tipo: arquitectura / integraciones
+Prioridad: P2
+Version reportada: v0.3 en desarrollo
+Origen: discusion de QA
+Estado: decidido para post-v0.3
+
+Decision:
+
+Un MCP de Trace seria util para que agentes externos consulten notas, creen capturas o auditen vaults, pero no reemplaza el QA de release. Para cerrar v0.3, las pruebas deben vivir como scripts, tests HTTP y Playwright en CI. El MCP queda como candidato para `v0.3.x` o `v0.4`, cuando la API self-host y los comandos desktop esten estabilizados.

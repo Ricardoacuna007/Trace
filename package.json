@@ -15,6 +15,7 @@
     "server:prepare-web": "node scripts/prepare-server-web.mjs",
     "server:dev": "npm run build && npm run server:prepare-web && cargo run -p trace-server --",
     "server:build": "npm run build && npm run server:prepare-web && cargo build --release -p trace-server",
+    "smoke:self-host": "node scripts/self-host-smoke.mjs",
     "cargo:clippy": "cargo clippy --workspace --all-targets -- -D warnings",
     "cargo:test": "cargo test --workspace",
     "test": "vitest run",
