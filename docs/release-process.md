@@ -34,14 +34,14 @@ git tag v0.3.0
 git push origin v0.3.0
 ```
 
-El workflow `Build Linux Desktop` crea un release draft y adjunta:
+El workflow `Build Linux Desktop` crea o actualiza el release y adjunta:
 
 - `.deb`
 - `.AppImage`
 - `trace-server-linux-x86_64.tar.gz`
 - `trace-server-linux-x86_64.tar.gz.sha256`
 
-El workflow `Build Windows Desktop` adjunta al mismo release draft:
+El workflow `Build Windows Desktop` adjunta al mismo release:
 
 - `.msi`
 - `-setup.exe`
@@ -53,10 +53,10 @@ El workflow `Publish Docker Image` publica:
 
 ## Publicar
 
-1. Revisar el draft en GitHub Releases.
+1. Abrir GitHub Releases.
 2. Descargar y probar los artefactos.
-3. Completar notas de release usando `CHANGELOG.md`.
-4. Publicar manualmente el release.
+3. Si hay un problema, despublicar el release y corregir con un patch tag.
+4. Completar o ajustar notas de release usando `CHANGELOG.md`.
 
 ## Pendiente de release automation
 

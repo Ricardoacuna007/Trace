@@ -57,7 +57,7 @@ jobs:
       - name: Attach Windows bundles to tagged release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
           files: |
             target/release/bundle/msi/*.msi
             target/release/bundle/nsis/*-setup.exe
