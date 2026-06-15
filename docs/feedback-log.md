@@ -168,3 +168,154 @@ Estado: decidido para post-v0.3
 Decision:
 
 Un MCP de Trace seria util para que agentes externos consulten notas, creen capturas o auditen vaults, pero no reemplaza el QA de release. Para cerrar v0.3, las pruebas deben vivir como scripts, tests HTTP y Playwright en CI. El MCP queda como candidato para `v0.3.x` o `v0.4`, cuando la API self-host y los comandos desktop esten estabilizados.
+
+### FEEDBACK-009 - Error ACL al cambiar entre Workspace y Editor
+
+Tipo: bug / desktop
+Prioridad: P1
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+Al cambiar varias veces entre Workspace y Editor aparece el error:
+
+```text
+Command plugin:window|start_dragging not allowed by ACL.
+```
+
+Criterio de resolucion:
+
+- Cambiar entre vistas no debe disparar comandos de drag de ventana fuera de una zona permitida.
+- No debe aparecer error visible en consola/UI al alternar `workspace`, `editor` y `graph`.
+- Revisar permisos/capabilities de Tauri y el uso de `data-tauri-drag-region` en `TitleBar`.
+
+### FEEDBACK-010 - No se puede renombrar una nota Untitled
+
+Tipo: bug / editor
+Prioridad: P1
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+Al renombrar una nota, cuando el usuario borra o llega a la `u` de `Untitled`, el titulo se repone automaticamente. Si selecciona todo y borra, vuelve a aparecer `Untitled`.
+
+Criterio de resolucion:
+
+- El campo de titulo debe permitir quedar temporalmente vacio mientras el usuario edita.
+- `Untitled` debe aplicarse solo al confirmar/guardar si el titulo final esta vacio, no en cada tecla.
+- Seleccionar todo, borrar y escribir un titulo nuevo debe funcionar sin que el store lo restaure a mitad de edicion.
+
+### FEEDBACK-011 - Accesos laterales sin vista propia
+
+Tipo: bug / UX
+Prioridad: P2
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+Los accesos de la barra lateral `Bandeja de entrada`, `Recientes`, `Favoritos` y `Etiquetas` no cambian a una vista especifica; llevan al workspace o se sienten redundantes.
+
+Criterio de resolucion:
+
+- Decidir si esos accesos se eliminan o se implementan como vistas reales.
+- Si se conservan, cada acceso debe mostrar una lista filtrada clara.
+- El estado activo del sidebar debe reflejar la vista actual.
+
+### FEEDBACK-012 - Apariencia no aplica fuente, texto ni escala global
+
+Tipo: bug / configuracion
+Prioridad: P1
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+En Settings > Apariencia, cambiar tamano o fuente no modifica realmente la UI. El fondo cambia, pero el color de texto no. Tambien falta una opcion de escala/zoom global de la aplicacion.
+
+Criterio de resolucion:
+
+- La configuracion de fuente debe afectar editor y UI de la app donde aplique.
+- El tamano de texto debe reflejarse en editor y superficies principales.
+- El color de texto debe cambiar igual que cambia el fondo.
+- Agregar control de escala global de la app, independiente del tamano del editor.
+- Persistir cambios en `trace.config.json` o settings equivalentes sin reiniciar.
+
+### FEEDBACK-013 - Settings necesita navegacion por secciones
+
+Tipo: mejora / configuracion
+Prioridad: P2
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+Configuracion esta concentrada en una sola vista larga. Se vuelve dificil ubicar Apariencia, Sincronizacion y otras opciones.
+
+Criterio de resolucion:
+
+- Dividir Settings en secciones navegables: Apariencia, Sincronizacion, Datos, Seguridad, Atajos, Avanzado.
+- Agregar una seccion de keybindings para ver y eventualmente modificar atajos.
+- Mantener densidad visual, sin convertir Settings en landing page.
+
+### FEEDBACK-014 - Barra inferior del grafo tiene informacion poco util
+
+Tipo: mejora / grafo
+Prioridad: P2
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+La barra inferior muestra `huerfanas` y `puentes resaltados`, pero esa informacion no aporta lo suficiente en el flujo actual.
+
+Criterio de resolucion:
+
+- Quitar `huerfanas` y `puentes resaltados` de la barra inferior si no son accionables.
+- Reemplazar por estados utiles: notas visibles, conexiones visibles, zoom, filtro activo, seleccion actual o estado de layout.
+- Mantener texto breve y escaneable.
+
+### FEEDBACK-015 - Renombrar y crear desde el arbol
+
+Tipo: mejora / workspace tree
+Prioridad: P1
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+El arbol no permite cambiar el nombre de una carpeta o nota directamente. Tambien falta una forma contextual de agregar elementos desde el arbol.
+
+Criterio de resolucion:
+
+- Doble click en carpeta/nota debe permitir renombrar inline.
+- Click derecho debe abrir menu contextual con `Renombrar`, `Nueva nota`, `Nueva carpeta`, `Eliminar` cuando aplique.
+- Crear elementos desde una carpeta debe respetar esa carpeta como padre.
+- Renombrar debe compartir la misma logica corregida del titulo de nota.
+
+### FEEDBACK-016 - Acciones de crear/configurar estan mal ubicadas
+
+Tipo: mejora / navegacion
+Prioridad: P2
+Version reportada: v0.3.0
+Origen: prueba manual instalada
+Estado: abierto
+
+Problema:
+
+Las acciones para crear elementos o entrar a configuracion estan al final de los accesos rapidos del sidebar y se sienten liosas o mezcladas con navegacion.
+
+Criterio de resolucion:
+
+- Separar acciones globales de navegacion.
+- Evaluar mover `Nueva nota`, `Nueva carpeta` y `Configuracion` a un header/sidebar action bar o command palette mas clara.
+- Evitar que los accesos rapidos parezcan vistas si en realidad son acciones.
